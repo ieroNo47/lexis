@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  run:
+    cmds:
+      - go run .
+    desc: Run the lexis application
+
+  build:
+    cmds:
+      - go build -o lexis
+    desc: Build the lexis binary
+
+  install:
+    cmds:
+      - go install .
+    desc: Install lexis binary to $GOPATH/bin
+
+  default:
+    cmds:
+      - task --list
+    desc: List available tasks
