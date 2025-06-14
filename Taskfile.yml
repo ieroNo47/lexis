@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  run:
+    cmds:
+      - task: lint
+      - go run .
+    desc: Run the lexis application
+
+  build:
+    cmds:
+      - task: lint
+      - go build -o lexis
+    desc: Build the lexis binary
+
+  install:
+    cmds:
+      - go install .
+    desc: Install lexis binary to $GOPATH/bin
+
+  lint:
+    cmds:
+      - golangci-lint run
+    desc: Run golangci-lint to check code
+
+  default:
+    cmds:
+      - task --list
+    desc: List available tasks

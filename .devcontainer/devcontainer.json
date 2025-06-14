@@ -1,0 +1,33 @@
+{
+    "name": "Go Development",
+    "image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+    
+    "remoteEnv": {
+        "GOLANGCI_LINT_VERSION": "v2.1.6",
+        "JUST_INSTALL_PATH": "/home/vscode/.local/bin"
+    },
+
+    "features": {
+        "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
+        "ghcr.io/devcontainers-extra/features/go-task:1": {}
+    },
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "skellock.just",
+                "ms-vscode.makefile-tools",
+                "task.vscode-task",
+                "naumovs.color-highlight"
+            ],
+            "settings": {
+                "go.toolsManagement.checkForUpdates": "local",
+                "go.useLanguageServer": true,
+                "go.gopath": "/go"
+            }
+        }
+    },
+
+    "postCreateCommand": "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION} && mkdir -p ${JUST_INSTALL_PATH} && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ${JUST_INSTALL_PATH}"
+}
