@@ -2,6 +2,8 @@
 package main
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -49,10 +51,11 @@ type word []letter
 type grid []word
 
 type model struct {
-	grid   grid
-	ri     int // row index
-	ci     int // column index
-	answer []rune
+	grid     grid
+	ri       int // row index
+	ci       int // column index
+	answer   []rune
+	finished bool // whether the game is finished
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -62,11 +65,20 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			return m, tea.Quit
+		}
+
+		// If the game is finished, ignore all other key presses
+		if m.finished {
+			return m, nil
+		}
+
+		switch msg.String() {
 		case "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z":
 			// if the key is a letter, add it to the grid at the current position
 			if m.ri < len(m.grid) && m.ci < len(m.grid[m.ri]) {
@@ -79,8 +91,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			// if the key is enter, move to the next row if we're one row before the end and the row is full
-			if m.ri < len(m.grid)-1 && (m.ci == len(m.grid[m.ri])-1 && m.grid[m.ri][m.ci].r != ' ') {
+			// if row is full, evaluate the row
+			// row is full if the last letter is not a space
+			if m.ci == len(m.grid[m.ri])-1 && m.grid[m.ri][m.ci].r != ' ' {
 				for i, l := range m.grid[m.ri] {
 					// change style based on match
 					if l.r == m.answer[i] {
@@ -97,8 +110,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					}
 				}
-				m.ri++
-				m.ci = 0 // reset column index
+				// move to the next row if we're one row before the end
+				if m.ri < len(m.grid)-1 {
+					m.ri++
+					m.ci = 0 // reset column index
+				} else {
+					m.finished = true // mark the game as finished
+				}
 			}
 		case "backspace":
 			// if the key is backspace, remove the last character in the current row
@@ -111,18 +129,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	}
+
 	// reset the style of all letters in the row
 	for i := range m.grid[m.ri] {
 		m.grid[m.ri][i].style = defaultStyle
 	}
 	// set the style of the current letter to active
 	m.grid[m.ri][m.ci].style = activeStyle
+
 	return m, nil
 }
 
 func (m model) View() string {
 	// create a view of the grid
-	rows := make([]string, len(m.grid))
+	rows := make([]string, len(m.grid)+1)
 	for _, w := range m.grid {
 		row := []string{}
 		for _, l := range w {
@@ -130,8 +150,18 @@ func (m model) View() string {
 		}
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Bottom, row...))
 	}
-	view := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	if m.finished {
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press any key to exit."))
+	} else {
+		// debug row
+		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c",
+			m.ri,
+			m.ci,
+			len(m.grid[m.ri])-1,
+			m.grid[m.ri][m.ci].r)))
 
+	}
+	view := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	return view
 }
 

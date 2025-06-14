@@ -18,7 +18,8 @@
                 "golang.go",
                 "skellock.just",
                 "ms-vscode.makefile-tools",
-                "task.vscode-task"
+                "task.vscode-task",
+                "naumovs.color-highlight"
             ],
             "settings": {
                 "go.toolsManagement.checkForUpdates": "local",
