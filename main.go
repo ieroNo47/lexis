@@ -56,6 +56,7 @@ type model struct {
 	ci       int // column index
 	answer   []rune
 	finished bool // whether the game is finished
+	win      bool // whether the game is won
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -94,6 +95,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// if row is full, evaluate the row
 			// row is full if the last letter is not a space
 			if m.ci == len(m.grid[m.ri])-1 && m.grid[m.ri][m.ci].r != ' ' {
+				if isMatch(m.answer, m.grid[m.ri]) {
+					m.win = true // mark the game as won
+				}
 				for i, l := range m.grid[m.ri] {
 					// change style based on match
 					if l.r == m.answer[i] {
@@ -111,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				// move to the next row if we're one row before the end
-				if m.ri < len(m.grid)-1 {
+				if m.ri < len(m.grid)-1 && !m.win {
 					m.ri++
 					m.ci = 0 // reset column index
 				} else {
@@ -130,12 +134,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	}
 
-	// reset the style of all letters in the row
-	for i := range m.grid[m.ri] {
-		m.grid[m.ri][i].style = defaultStyle
+	if !m.finished {
+		// reset the style of all letters in the row
+		for i := range m.grid[m.ri] {
+			m.grid[m.ri][i].style = defaultStyle
+		}
+		// set the style of the current letter to active
+		m.grid[m.ri][m.ci].style = activeStyle
 	}
-	// set the style of the current letter to active
-	m.grid[m.ri][m.ci].style = activeStyle
 
 	return m, nil
 }
@@ -151,7 +157,12 @@ func (m model) View() string {
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Bottom, row...))
 	}
 	if m.finished {
-		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press any key to exit."))
+		if m.win {
+			rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.ri+1, len(m.grid))))
+		} else {
+			rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#cc0")).Render("Better luck next time!", fmt.Sprintf("The answer was: %s", string(m.answer))))
+		}
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press ctrl+c or Esc to exit."))
 	} else {
 		// debug row
 		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c",
@@ -180,4 +191,13 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		panic(err)
 	}
+}
+
+func isMatch(answer []rune, guess word) (match bool) {
+	for i, l := range guess {
+		if l.r != answer[i] {
+			return false
+		}
+	}
+	return true
 }
