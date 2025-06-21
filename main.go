@@ -4,6 +4,8 @@ package main
 import (
 	"fmt"
 
+	"slices"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -98,20 +100,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if isMatch(m.answer, m.grid[m.ri]) {
 					m.win = true // mark the game as won
 				}
+				// WIP/BUG: if answer is 'lexes' and the user types 'eleex', it highlights the first two 'e's as existing (yellow)
+				// and the last 'e' as exact (green), which is incorrect. It should only highlight the first 'e' as existing and the 3rd 'e' as exact.
+				tw := make(tempWord, len(m.answer))
+				copy(tw, m.answer)
 				for i, l := range m.grid[m.ri] {
 					// change style based on match
 					if l.r == m.answer[i] {
 						m.grid[m.ri][i].style = exactMatchStyle
+						tw = tw.remove(l.r) // remove the letter from the temporary word
+					} else if tw.has(l.r) {
+						m.grid[m.ri][i].style = existsMatchStyle
+						tw = tw.remove(l.r) // remove the letter from the temporary word
 					} else {
-						// TODO: correctly handle letters that exist twice or more times in the answer
-						for j, al := range m.answer {
-							if j != i && l.r == al {
-								m.grid[m.ri][i].style = existsMatchStyle
-								break
-							}
-							m.grid[m.ri][i].style = notMatchStyle
-						}
-
+						m.grid[m.ri][i].style = notMatchStyle
 					}
 				}
 				// move to the next row if we're one row before the end
@@ -165,11 +167,12 @@ func (m model) View() string {
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press ctrl+c or Esc to exit."))
 	} else {
 		// debug row
-		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c",
+		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
 			m.ri,
 			m.ci,
 			len(m.grid[m.ri])-1,
-			m.grid[m.ri][m.ci].r)))
+			m.grid[m.ri][m.ci].r,
+			string(m.answer))))
 
 	}
 	view := lipgloss.JoinVertical(lipgloss.Left, rows...)
@@ -185,7 +188,7 @@ func main() {
 			grid[i][j] = letter{r: ' ', style: defaultStyle}
 		}
 	}
-	p := tea.NewProgram(model{grid: grid, answer: []rune("lexis")}, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: grid, answer: []rune("lexes")}, tea.WithAltScreen())
 
 	// run the program
 	if _, err := p.Run(); err != nil {
@@ -193,11 +196,26 @@ func main() {
 	}
 }
 
-func isMatch(answer []rune, guess word) (match bool) {
+func isMatch(answer []rune, guess word) bool {
 	for i, l := range guess {
 		if l.r != answer[i] {
 			return false
 		}
 	}
 	return true
+}
+
+type tempWord []rune
+
+func (tw tempWord) has(r rune) bool {
+	return slices.Contains(tw, r)
+}
+
+func (tw tempWord) remove(r rune) tempWord {
+	for i, tr := range tw {
+		if tr == r {
+			return slices.Delete(tw, i, i+1)
+		}
+	}
+	return tw
 }
