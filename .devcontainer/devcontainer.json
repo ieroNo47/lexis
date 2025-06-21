@@ -29,5 +29,5 @@
         }
     },
 
-    "postCreateCommand": "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION} && mkdir -p ${JUST_INSTALL_PATH} && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ${JUST_INSTALL_PATH}"
+    "postCreateCommand": "bash ./.devcontainer/post-create.sh"
 }
