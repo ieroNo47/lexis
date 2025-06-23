@@ -4,6 +4,8 @@ package main
 import (
 	"fmt"
 
+	"slices"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -24,24 +26,37 @@ var exactMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#7d7")).
+	Foreground(lipgloss.Color("#7d7")).
 	Inherit(defaultStyle)
 
 var existsMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#cc0")).
+	Foreground(lipgloss.Color("#cc0")).
 	Inherit(defaultStyle)
 
 var notMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#444")).
+	Foreground(lipgloss.Color("#444")).
 	Inherit(defaultStyle)
+
+// consts for states of a letter, matched, exists, not matched
+// currently helps when checking the letter state over different iterations
+const (
+	matched    = iota // letter is in the correct position
+	exists            // letter is in the word but not in the correct position
+	notMatched        // letter is not in the word
+	notChecked        // letter has not been checked yet
+)
 
 // letter represents a single letter and its style
 type letter struct {
 	r     rune
 	style lipgloss.Style
+	state int
 }
 
 // word represents a row of letters
@@ -98,20 +113,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if isMatch(m.answer, m.grid[m.ri]) {
 					m.win = true // mark the game as won
 				}
+				// temp slice to keep track of letters that are still to be matched
+				tw := make(tempWord, len(m.answer))
+				copy(tw, m.answer)
+				// first pass: check for exact matches
 				for i, l := range m.grid[m.ri] {
 					// change style based on match
 					if l.r == m.answer[i] {
 						m.grid[m.ri][i].style = exactMatchStyle
-					} else {
-						// TODO: correctly handle letters that exist twice or more times in the answer
-						for j, al := range m.answer {
-							if j != i && l.r == al {
-								m.grid[m.ri][i].style = existsMatchStyle
-								break
-							}
-							m.grid[m.ri][i].style = notMatchStyle
-						}
-
+						m.grid[m.ri][i].state = matched // mark the letter as matched
+						tw = tw.remove(l.r)             // remove the letter from the temporary word
+					}
+				}
+				// second pass: check for exists matches and not matches
+				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
+				for i, l := range m.grid[m.ri] {
+					if tw.has(l.r) && l.state != matched {
+						m.grid[m.ri][i].style = existsMatchStyle
+						m.grid[m.ri][i].state = exists // mark the letter as exists
+						tw = tw.remove(l.r)            // remove the letter from the temporary word
+					} else if l.state != matched {
+						m.grid[m.ri][i].style = notMatchStyle
+						m.grid[m.ri][i].state = notMatched // mark the letter as not matched
 					}
 				}
 				// move to the next row if we're one row before the end
@@ -165,11 +188,12 @@ func (m model) View() string {
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press ctrl+c or Esc to exit."))
 	} else {
 		// debug row
-		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c",
+		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
 			m.ri,
 			m.ci,
 			len(m.grid[m.ri])-1,
-			m.grid[m.ri][m.ci].r)))
+			m.grid[m.ri][m.ci].r,
+			string(m.answer))))
 
 	}
 	view := lipgloss.JoinVertical(lipgloss.Left, rows...)
@@ -182,10 +206,10 @@ func main() {
 	for i := range grid {
 		grid[i] = make([]letter, 5)
 		for j := range grid[i] {
-			grid[i][j] = letter{r: ' ', style: defaultStyle}
+			grid[i][j] = letter{r: ' ', style: defaultStyle, state: notChecked}
 		}
 	}
-	p := tea.NewProgram(model{grid: grid, answer: []rune("lexis")}, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: grid, answer: []rune("lexes")}, tea.WithAltScreen())
 
 	// run the program
 	if _, err := p.Run(); err != nil {
@@ -193,11 +217,28 @@ func main() {
 	}
 }
 
-func isMatch(answer []rune, guess word) (match bool) {
+func isMatch(answer []rune, guess word) bool {
 	for i, l := range guess {
 		if l.r != answer[i] {
 			return false
 		}
 	}
 	return true
+}
+
+// tempWord is a slice alias for []rune that provides methods to check for existence and remove letters.
+// Used to keep track of letters that are still to be matched.
+type tempWord []rune
+
+func (tw tempWord) has(r rune) bool {
+	return slices.Contains(tw, r)
+}
+
+func (tw tempWord) remove(r rune) tempWord {
+	for i, tr := range tw {
+		if tr == r {
+			return slices.Delete(tw, i, i+1)
+		}
+	}
+	return tw
 }
