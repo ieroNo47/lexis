@@ -26,24 +26,37 @@ var exactMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#7d7")).
+	Foreground(lipgloss.Color("#7d7")).
 	Inherit(defaultStyle)
 
 var existsMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#cc0")).
+	Foreground(lipgloss.Color("#cc0")).
 	Inherit(defaultStyle)
 
 var notMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
 	BorderForeground(lipgloss.Color("#444")).
+	Foreground(lipgloss.Color("#444")).
 	Inherit(defaultStyle)
+
+// consts for states of a letter, matched, exists, not matched
+// currently helps when checking the letter state over different iterations
+const (
+	matched    = iota // letter is in the correct position
+	exists            // letter is in the word but not in the correct position
+	notMatched        // letter is not in the word
+	notChecked        // letter has not been checked yet
+)
 
 // letter represents a single letter and its style
 type letter struct {
 	r     rune
 	style lipgloss.Style
+	state int
 }
 
 // word represents a row of letters
@@ -100,20 +113,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if isMatch(m.answer, m.grid[m.ri]) {
 					m.win = true // mark the game as won
 				}
-				// WIP/BUG: if answer is 'lexes' and the user types 'eleex', it highlights the first two 'e's as existing (yellow)
-				// and the last 'e' as exact (green), which is incorrect. It should only highlight the first 'e' as existing and the 3rd 'e' as exact.
+				// temp slice to keep track of letters that are still to be matched
 				tw := make(tempWord, len(m.answer))
 				copy(tw, m.answer)
+				// first pass: check for exact matches
 				for i, l := range m.grid[m.ri] {
 					// change style based on match
 					if l.r == m.answer[i] {
 						m.grid[m.ri][i].style = exactMatchStyle
-						tw = tw.remove(l.r) // remove the letter from the temporary word
-					} else if tw.has(l.r) {
+						m.grid[m.ri][i].state = matched // mark the letter as matched
+						tw = tw.remove(l.r)             // remove the letter from the temporary word
+					}
+				}
+				// second pass: check for exists matches and not matches
+				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
+				for i, l := range m.grid[m.ri] {
+					if tw.has(l.r) && l.state != matched {
 						m.grid[m.ri][i].style = existsMatchStyle
-						tw = tw.remove(l.r) // remove the letter from the temporary word
-					} else {
+						m.grid[m.ri][i].state = exists // mark the letter as exists
+						tw = tw.remove(l.r)            // remove the letter from the temporary word
+					} else if l.state != matched {
 						m.grid[m.ri][i].style = notMatchStyle
+						m.grid[m.ri][i].state = notMatched // mark the letter as not matched
 					}
 				}
 				// move to the next row if we're one row before the end
@@ -185,7 +206,7 @@ func main() {
 	for i := range grid {
 		grid[i] = make([]letter, 5)
 		for j := range grid[i] {
-			grid[i][j] = letter{r: ' ', style: defaultStyle}
+			grid[i][j] = letter{r: ' ', style: defaultStyle, state: notChecked}
 		}
 	}
 	p := tea.NewProgram(model{grid: grid, answer: []rune("lexes")}, tea.WithAltScreen())
@@ -205,6 +226,8 @@ func isMatch(answer []rune, guess word) bool {
 	return true
 }
 
+// tempWord is a slice alias for []rune that provides methods to check for existence and remove letters.
+// Used to keep track of letters that are still to be matched.
 type tempWord []rune
 
 func (tw tempWord) has(r rune) bool {
