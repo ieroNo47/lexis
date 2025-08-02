@@ -3,12 +3,18 @@ package main
 
 import (
 	"fmt"
-
 	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+var containerStyle = lipgloss.NewStyle().
+	Margin(0).
+	Padding(0, 0, 0, 0).
+	Align(lipgloss.Center, lipgloss.Center).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#8af"))
 
 // styles for each state of a letter in the grid
 var defaultStyle = lipgloss.NewStyle().
@@ -83,6 +89,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// oVertical := containerStyle.GetBorderTopSize() +
+		// 	containerStyle.GetBorderBottomSize() +
+		// 	containerStyle.GetMarginTop() +
+		// 	containerStyle.GetMarginBottom()
+
+		oHorizontal := containerStyle.GetBorderLeftSize() +
+			containerStyle.GetBorderRightSize() +
+			containerStyle.GetMarginLeft() +
+			containerStyle.GetMarginRight()
+
+		// size of the parent container adjusted to be the window size - the size of the borders and margins
+		containerStyle = containerStyle.Width(msg.Width - oHorizontal)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
@@ -171,45 +190,60 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	// create a view of the grid
-	rows := make([]string, len(m.grid)+1)
+	rows := make([]string, 0, len(m.grid)+5)
 	for _, w := range m.grid {
 		row := []string{}
 		for _, l := range w {
+			// render each letter with its style
 			row = append(row, l.style.Render(string(l.r)))
 		}
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Bottom, row...))
+		// a row is all letters joined horizontally
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Center, row...))
 	}
+
+	// status row
+	var statusRow string
 	if m.finished {
 		if m.win {
-			rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.ri+1, len(m.grid))))
+			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.ri+1, len(m.grid)))
 		} else {
-			rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#cc0")).Render("Better luck next time!", fmt.Sprintf("The answer was: %s", string(m.answer))))
+			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#cc0")).Render("Better luck next time!", fmt.Sprintf("The answer was: %s", string(m.answer)))
 		}
-		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render("Game Over! Press ctrl+c or Esc to exit."))
+		statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render(statusRow + "\nGame Over! Press ctrl+c or Esc to exit.")
 	} else {
 		// debug row
-		rows = append(rows, lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
+		statusRow = lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
 			m.ri,
 			m.ci,
 			len(m.grid[m.ri])-1,
 			m.grid[m.ri][m.ci].r,
-			string(m.answer))))
+			string(m.answer)))
 
 	}
-	view := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	return view
+	rows = append(rows, statusRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, rows...)
+	return containerStyle.Render(view)
+
+	// debug code
+	// s1 := activeStyle.Render("l")
+	// s2 := defaultStyle.Render("l")
+	// r := lipgloss.JoinHorizontal(lipgloss.Center, s1, s2, s1, s2, s1)
+	// rows = append(rows, r)
+	// v := lipgloss.JoinVertical(lipgloss.Center, rows...)
+	// return containerStyle.Render(v)
+
 }
 
 func main() {
 	// create a new bubbletea program with our model
-	grid := make([]word, 5)
+	grid := make([]word, 6)
 	for i := range grid {
 		grid[i] = make([]letter, 5)
 		for j := range grid[i] {
 			grid[i][j] = letter{r: ' ', style: defaultStyle, state: notChecked}
 		}
 	}
-	p := tea.NewProgram(model{grid: grid, answer: []rune("lexes")}, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: grid, answer: []rune("whole")}, tea.WithAltScreen())
 
 	// run the program
 	if _, err := p.Run(); err != nil {
