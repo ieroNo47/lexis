@@ -9,72 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var containerStyle = lipgloss.NewStyle().
-	Margin(0).
-	Padding(0, 0, 0, 0).
-	Align(lipgloss.Center, lipgloss.Center).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#8af"))
-
-// styles for each state of a letter in the grid
-var defaultStyle = lipgloss.NewStyle().
-	Padding(0, 1).
-	Margin(0).
-	Border(lipgloss.RoundedBorder())
-
-var activeStyle = lipgloss.NewStyle().
-	Padding(0, 1).
-	Margin(0).
-	BorderForeground(lipgloss.Color("#8af")).
-	Inherit(defaultStyle)
-
-var exactMatchStyle = lipgloss.NewStyle().
-	Padding(0, 1).
-	Margin(0).
-	BorderForeground(lipgloss.Color("#7d7")).
-	Foreground(lipgloss.Color("#7d7")).
-	Inherit(defaultStyle)
-
-var existsMatchStyle = lipgloss.NewStyle().
-	Padding(0, 1).
-	Margin(0).
-	BorderForeground(lipgloss.Color("#cc0")).
-	Foreground(lipgloss.Color("#cc0")).
-	Inherit(defaultStyle)
-
-var notMatchStyle = lipgloss.NewStyle().
-	Padding(0, 1).
-	Margin(0).
-	BorderForeground(lipgloss.Color("#444")).
-	Foreground(lipgloss.Color("#444")).
-	Inherit(defaultStyle)
-
-// consts for states of a letter, matched, exists, not matched
-// currently helps when checking the letter state over different iterations
-const (
-	matched    = iota // letter is in the correct position
-	exists            // letter is in the word but not in the correct position
-	notMatched        // letter is not in the word
-	notChecked        // letter has not been checked yet
-)
-
-// letter represents a single letter and its style
-type letter struct {
-	r     rune
-	style lipgloss.Style
-	state int
-}
-
-// word represents a row of letters
-type word []letter
-
-// grid represents the grid where each row is a word
-type grid []word
-
 type model struct {
 	grid     grid
-	ri       int // row index
-	ci       int // column index
 	answer   []rune
 	finished bool // whether the game is finished
 	win      bool // whether the game is won
@@ -110,139 +46,98 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If the game is finished, ignore all other key presses
 		if m.finished {
+			if msg.String() == "r" {
+				m.grid.reset()
+				m.finished = false
+				m.win = false
+			}
 			return m, nil
 		}
 
 		switch msg.String() {
 		case "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z":
-			// if the key is a letter, add it to the grid at the current position
-			if m.ri < len(m.grid) && m.ci < len(m.grid[m.ri]) {
-				if len(msg.Runes) > 0 {
-					m.grid[m.ri][m.ci].r = msg.Runes[0]
-					// move to the next column only if we're one position before the end
-					if m.ci < len(m.grid[m.ri])-1 {
-						m.ci++
-					}
-				}
-			}
+			// if the key is a letter, add it to the grid
+			m.grid.setLetter(msg.Runes[0])
 		case "enter":
 			// if row is full, evaluate the row
 			// row is full if the last letter is not a space
-			if m.ci == len(m.grid[m.ri])-1 && m.grid[m.ri][m.ci].r != ' ' {
-				if isMatch(m.answer, m.grid[m.ri]) {
+			if m.grid.rowFull() {
+				if isMatch(m.answer, m.grid.words[m.grid.rowIndex]) {
 					m.win = true // mark the game as won
 				}
 				// temp slice to keep track of letters that are still to be matched
 				tw := make(tempWord, len(m.answer))
 				copy(tw, m.answer)
 				// first pass: check for exact matches
-				for i, l := range m.grid[m.ri] {
+				for i, l := range m.grid.words[m.grid.rowIndex] {
 					// change style based on match
 					if l.r == m.answer[i] {
-						m.grid[m.ri][i].style = exactMatchStyle
-						m.grid[m.ri][i].state = matched // mark the letter as matched
-						tw = tw.remove(l.r)             // remove the letter from the temporary word
+						m.grid.updateState(m.grid.rowIndex, i, matched) // mark the letter as matched
+						tw = tw.remove(l.r)                             // remove the letter from the temporary word
 					}
 				}
 				// second pass: check for exists matches and not matches
 				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
-				for i, l := range m.grid[m.ri] {
+				for i, l := range m.grid.words[m.grid.rowIndex] {
 					if tw.has(l.r) && l.state != matched {
-						m.grid[m.ri][i].style = existsMatchStyle
-						m.grid[m.ri][i].state = exists // mark the letter as exists
-						tw = tw.remove(l.r)            // remove the letter from the temporary word
+						m.grid.words[m.grid.rowIndex][i].style = existsMatchStyle
+						m.grid.words[m.grid.rowIndex][i].state = exists // mark the letter as exists
+						tw = tw.remove(l.r)                             // remove the letter from the temporary word
 					} else if l.state != matched {
-						m.grid[m.ri][i].style = notMatchStyle
-						m.grid[m.ri][i].state = notMatched // mark the letter as not matched
+						m.grid.words[m.grid.rowIndex][i].style = notMatchStyle
+						m.grid.words[m.grid.rowIndex][i].state = notMatched // mark the letter as not matched
 					}
 				}
 				// move to the next row if we're one row before the end
-				if m.ri < len(m.grid)-1 && !m.win {
-					m.ri++
-					m.ci = 0 // reset column index
+
+				if m.win {
+					// if the game is won, mark it as finished
+					m.finished = true
 				} else {
-					m.finished = true // mark the game as finished
+					rowChanged := m.grid.goToNextRow()
+					if !rowChanged {
+						m.finished = true // mark the game as finished if there are no more rows
+					}
 				}
 			}
 		case "backspace":
-			// if the key is backspace, remove the last character in the current row
-			if m.ci > 0 {
-				if m.grid[m.ri][m.ci].r == ' ' {
-					m.ci--
-				}
-			}
-			m.grid[m.ri][m.ci].r = ' '
+			// if the key is backspace, delete the last letter
+			m.grid.deleteLetter()
 		}
 
-	}
-
-	if !m.finished {
-		// reset the style of all letters in the row
-		for i := range m.grid[m.ri] {
-			m.grid[m.ri][i].style = defaultStyle
-		}
-		// set the style of the current letter to active
-		m.grid[m.ri][m.ci].style = activeStyle
 	}
 
 	return m, nil
 }
 
 func (m model) View() string {
-	// create a view of the grid
-	rows := make([]string, 0, len(m.grid)+5)
-	for _, w := range m.grid {
-		row := []string{}
-		for _, l := range w {
-			// render each letter with its style
-			row = append(row, l.style.Render(string(l.r)))
-		}
-		// a row is all letters joined horizontally
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Center, row...))
-	}
-
 	// status row
 	var statusRow string
 	if m.finished {
 		if m.win {
-			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.ri+1, len(m.grid)))
+			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.grid.rowIndex+1, len(m.grid.words)))
 		} else {
 			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#cc0")).Render("Better luck next time!", fmt.Sprintf("The answer was: %s", string(m.answer)))
 		}
-		statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render(statusRow + "\nGame Over! Press ctrl+c or Esc to exit.")
+		statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render(statusRow + "\nGame Over! Press ctrl+c or Esc to exit, r to restart.")
 	} else {
 		// debug row
 		statusRow = lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
-			m.ri,
-			m.ci,
-			len(m.grid[m.ri])-1,
-			m.grid[m.ri][m.ci].r,
+			m.grid.rowIndex,
+			m.grid.colIndex,
+			len(m.grid.words[m.grid.rowIndex])-1,
+			m.grid.words[m.grid.rowIndex][m.grid.colIndex].r,
 			string(m.answer)))
 
 	}
-	rows = append(rows, statusRow)
-	view := lipgloss.JoinVertical(lipgloss.Center, rows...)
+	// rows = append(rows, statusRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, m.grid.render(), statusRow)
 	return containerStyle.Render(view)
-
-	// debug code
-	// s1 := activeStyle.Render("l")
-	// s2 := defaultStyle.Render("l")
-	// r := lipgloss.JoinHorizontal(lipgloss.Center, s1, s2, s1, s2, s1)
-	// rows = append(rows, r)
-	// v := lipgloss.JoinVertical(lipgloss.Center, rows...)
-	// return containerStyle.Render(v)
-
 }
 
 func main() {
 	// create a new bubbletea program with our model
-	grid := make([]word, 6)
-	for i := range grid {
-		grid[i] = make([]letter, 5)
-		for j := range grid[i] {
-			grid[i][j] = letter{r: ' ', style: defaultStyle, state: notChecked}
-		}
-	}
+	grid := newGrid(6, 5)
 	p := tea.NewProgram(model{grid: grid, answer: []rune("whole")}, tea.WithAltScreen())
 
 	// run the program
