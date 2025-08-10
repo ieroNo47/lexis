@@ -11,6 +11,7 @@ import (
 
 type model struct {
 	grid     grid
+	keyboard keyboard
 	answer   []rune
 	finished bool // whether the game is finished
 	win      bool // whether the game is won
@@ -48,6 +49,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.finished {
 			if msg.String() == "r" {
 				m.grid.reset()
+				m.keyboard.reset()
 				m.finished = false
 				m.win = false
 			}
@@ -73,6 +75,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// change style based on match
 					if l.r == m.answer[i] {
 						m.grid.updateState(m.grid.rowIndex, i, matched) // mark the letter as matched
+						m.keyboard.updateLetterState(l.r, matched)      // update the keyboard state
 						tw = tw.remove(l.r)                             // remove the letter from the temporary word
 					}
 				}
@@ -80,12 +83,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
 				for i, l := range m.grid.words[m.grid.rowIndex] {
 					if tw.has(l.r) && l.state != matched {
-						m.grid.words[m.grid.rowIndex][i].style = existsMatchStyle
-						m.grid.words[m.grid.rowIndex][i].state = exists // mark the letter as exists
-						tw = tw.remove(l.r)                             // remove the letter from the temporary word
+						m.grid.updateState(m.grid.rowIndex, i, exists) // mark the letter as exists
+						m.keyboard.updateLetterState(l.r, exists)      // update the keyboard state
+						tw = tw.remove(l.r)                            // remove the letter from the temporary word
 					} else if l.state != matched {
-						m.grid.words[m.grid.rowIndex][i].style = notMatchStyle
-						m.grid.words[m.grid.rowIndex][i].state = notMatched // mark the letter as not matched
+						m.grid.updateState(m.grid.rowIndex, i, notMatched) // mark the letter as not matched
+						m.keyboard.updateLetterState(l.r, notMatched)      // update the keyboard state
 					}
 				}
 				// move to the next row if we're one row before the end
@@ -131,14 +134,16 @@ func (m model) View() string {
 
 	}
 	// rows = append(rows, statusRow)
-	view := lipgloss.JoinVertical(lipgloss.Center, m.grid.render(), statusRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, m.grid.render(), m.keyboard.render(), statusRow)
 	return containerStyle.Render(view)
 }
 
 func main() {
 	// create a new bubbletea program with our model
 	grid := newGrid(6, 5)
-	p := tea.NewProgram(model{grid: grid, answer: []rune("whole")}, tea.WithAltScreen())
+	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
+	keyboard := newKeyboard()
+	p := tea.NewProgram(model{grid: grid, keyboard: keyboard, answer: []rune("minty")}, tea.WithAltScreen())
 
 	// run the program
 	if _, err := p.Run(); err != nil {

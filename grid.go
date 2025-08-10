@@ -1,3 +1,4 @@
+// grid.go provides the grid data structure and logic for managing letter states and styles
 package main
 
 import "github.com/charmbracelet/lipgloss"
@@ -36,6 +37,7 @@ type grid struct {
 	rowIndex int
 }
 
+// Initializes a new grid with the specified number of rows and columns
 func newGrid(rows, cols int) grid {
 	grid := grid{
 		words:    make([]word, rows),
@@ -51,6 +53,7 @@ func newGrid(rows, cols int) grid {
 	return grid
 }
 
+// setLetter sets a letter in the grid at the next available position
 func (g *grid) setLetter(r rune) {
 	if g.rowIndex < len(g.words) && g.colIndex < len(g.words[g.rowIndex]) {
 		g.words[g.rowIndex][g.colIndex].r = r
@@ -62,6 +65,7 @@ func (g *grid) setLetter(r rune) {
 	}
 }
 
+// deleteLetter deletes the last letter in the current row
 func (g *grid) deleteLetter() {
 	// we move back only if we're not at the first column and the current letter is not empty
 	if g.colIndex > 0 {
@@ -73,10 +77,12 @@ func (g *grid) deleteLetter() {
 	g.words[g.rowIndex][g.colIndex].r = ' ' // delete the letter
 }
 
+// rowFull checks if the current row is full (i.e., all letters are filled)
 func (g *grid) rowFull() bool {
 	return g.colIndex == len(g.words[g.rowIndex])-1 && g.words[g.rowIndex][g.colIndex].r != ' '
 }
 
+// goToNextRow moves to the next row in the grid if possible
 func (g *grid) goToNextRow() bool {
 	if g.rowIndex < len(g.words)-1 {
 		g.rowIndex++   // move to the next row
@@ -88,12 +94,14 @@ func (g *grid) goToNextRow() bool {
 	}
 }
 
+// updateStyle updates the style of a letter at a specific position in the grid
 func (g *grid) updateStyle(row, col int, style lipgloss.Style) {
 	if row < len(g.words) && col < len(g.words[row]) {
 		g.words[row][col].style = style
 	}
 }
 
+// updateActiveCell updates the style of the active cell in the current row
 func (g *grid) updateActiveCell() {
 	for i := range g.words[g.rowIndex] {
 		if i == g.colIndex {
@@ -104,6 +112,7 @@ func (g *grid) updateActiveCell() {
 	}
 }
 
+// updateState updates the state of a letter at a specific position in the grid
 func (g *grid) updateState(row, col int, state int) {
 	if row < len(g.words) && col < len(g.words[row]) {
 		style, exists := stateStyles[state]
@@ -114,6 +123,7 @@ func (g *grid) updateState(row, col int, state int) {
 	}
 }
 
+// reset resets the grid to its initial state
 func (g *grid) reset() {
 	for i := range g.words {
 		for j := range g.words[i] {
@@ -125,6 +135,7 @@ func (g *grid) reset() {
 	g.updateActiveCell() // reset the active cell style
 }
 
+// render renders the grid as a string, with each letter styled according to its state
 func (g *grid) render() string {
 	rows := make([]string, 0, len(g.words))
 	for _, w := range g.words {
