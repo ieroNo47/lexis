@@ -59,10 +59,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z":
 			// if the key is a letter, add it to the grid
+			// https://pkg.go.dev/github.com/charmbracelet/bubbletea@v1.3.6#KeyMsg
+			// Doc: Note that Key.Runes will always contain at least one character, so you can always safely call Key.Runes[0].
 			m.grid.setLetter(msg.Runes[0])
 		case "enter":
 			// if row is full, evaluate the row
-			// row is full if the last letter is not a space
 			if m.grid.rowFull() {
 				if isMatch(m.answer, m.grid.words[m.grid.rowIndex]) {
 					m.win = true // mark the game as won
