@@ -3,10 +3,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type model struct {
@@ -15,6 +18,7 @@ type model struct {
 	answer   []rune
 	finished bool // whether the game is finished
 	win      bool // whether the game is won
+	log      *log.Logger
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -24,7 +28,7 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
-
+	m.log.Debug("[Update]", "msg", spew.Sdump(msg))
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// oVertical := containerStyle.GetBorderTopSize() +
@@ -39,15 +43,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// size of the parent container adjusted to be the window size - the size of the borders and margins
 		containerStyle = containerStyle.Width(msg.Width - oHorizontal)
+		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
+			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
 		}
 
 		// If the game is finished, ignore all other key presses
 		if m.finished {
 			if msg.String() == "r" {
+				m.log.Info("==== Restarting game ====")
 				m.grid.reset()
 				m.keyboard.reset()
 				m.finished = false
@@ -66,15 +73,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// if row is full, evaluate the row
 			if m.grid.rowFull() {
 				if isMatch(m.answer, m.grid.words[m.grid.rowIndex]) {
+					m.log.Info("Match found")
 					m.win = true // mark the game as won
 				}
 				// temp slice to keep track of letters that are still to be matched
 				tw := make(tempWord, len(m.answer))
 				copy(tw, m.answer)
 				// first pass: check for exact matches
+				m.log.Debug("== First Pass: Exact Matches ==")
 				for i, l := range m.grid.words[m.grid.rowIndex] {
 					// change style based on match
 					if l.r == m.answer[i] {
+						m.log.Debug("Update", "letter", string(l.r), "index", i, "state", states[matched])
 						m.grid.updateState(m.grid.rowIndex, i, matched) // mark the letter as matched
 						m.keyboard.updateLetterState(l.r, matched)      // update the keyboard state
 						tw = tw.remove(l.r)                             // remove the letter from the temporary word
@@ -82,24 +92,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				// second pass: check for exists matches and not matches
 				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
+				var targetState = notMatched
+				m.log.Debug("== Second Pass: Exists and Not Matches ==")
 				for i, l := range m.grid.words[m.grid.rowIndex] {
 					if tw.has(l.r) && l.state != matched {
+						targetState = exists
+						m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", states[exists])
 						m.grid.updateState(m.grid.rowIndex, i, exists) // mark the letter as exists
-						m.keyboard.updateLetterState(l.r, exists)      // update the keyboard state
 						tw = tw.remove(l.r)                            // remove the letter from the temporary word
 					} else if l.state != matched {
+						m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", "notMatched")
 						m.grid.updateState(m.grid.rowIndex, i, notMatched) // mark the letter as not matched
-						m.keyboard.updateLetterState(l.r, notMatched)      // update the keyboard state
 					}
+					if m.keyboard.getLetterState(l.r) != matched { // only update the keyboard state if it is not already matched
+						m.log.Debug("Keyboard Update", "letter", string(l.r), "to", states[targetState], "from", states[m.keyboard.getLetterState(l.r)])
+						m.keyboard.updateLetterState(l.r, targetState)
+					}
+					targetState = notMatched // reset target state
 				}
 				// move to the next row if we're one row before the end
 
 				if m.win {
 					// if the game is won, mark it as finished
+					m.log.Debug("Marking game as finished.", "reason", "win")
 					m.finished = true
 				} else {
 					rowChanged := m.grid.goToNextRow()
 					if !rowChanged {
+						m.log.Debug("Marking game as finished.", "reason", "no more rows")
 						m.finished = true // mark the game as finished if there are no more rows
 					}
 				}
@@ -110,7 +130,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	}
-
+	// if log level is debug, print the current string in the active row
+	if m.log.GetLevel() == log.DebugLevel {
+		var currentRow string
+		for _, l := range m.grid.words[m.grid.rowIndex] {
+			currentRow += string(l.r)
+		}
+		m.log.Debug("", "row", m.grid.rowIndex, "col", m.grid.colIndex, "string", currentRow)
+	}
 	return m, nil
 }
 
@@ -140,12 +167,34 @@ func (m model) View() string {
 }
 
 func main() {
+	// if err := os.Remove("debug.log"); err != nil && !os.IsNotExist(err) {
+	// 	fmt.Println("fatal:", err)
+	// 	os.Exit(1)
+	// }
+	// create a logger that writes to a file
+	f, err := tea.LogToFile("debug.log", "debug")
+	if err != nil {
+		fmt.Println("fatal:", err)
+		os.Exit(1)
+	}
+	//nolint:errcheck
+	defer f.Close()
+	logger := log.NewWithOptions(f, log.Options{
+		ReportTimestamp: true,
+		Level:           log.DebugLevel,
+	})
 	// create a new bubbletea program with our model
 	grid := newGrid(6, 5)
 	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
 	keyboard := newKeyboard()
-	p := tea.NewProgram(model{grid: grid, keyboard: keyboard, answer: []rune("minty")}, tea.WithAltScreen())
+	p := tea.NewProgram(model{
+		grid:     grid,
+		keyboard: keyboard,
+		answer:   []rune("minty"),
+		log:      logger,
+	}, tea.WithAltScreen())
 
+	logger.Info("==== Starting lexis ====")
 	// run the program
 	if _, err := p.Run(); err != nil {
 		panic(err)
