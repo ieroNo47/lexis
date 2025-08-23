@@ -1,7 +1,9 @@
 // keyboard.go provides the keyboard data structure and logic for managing letter states and styles
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+)
 
 type position struct {
 	row    int // row index
@@ -80,6 +82,15 @@ func (k *keyboard) updateLetterState(r rune, state int) {
 			k.layout[row][col].letter.state = state // update the state of the letter
 		}
 	}
+}
+
+func (k *keyboard) getLetterState(r rune) int {
+	if kl, exists := k.letters[r]; exists {
+		row := kl.position.row
+		col := kl.position.column
+		return k.layout[row][col].letter.state
+	}
+	return -1
 }
 
 func (k *keyboard) reset() {

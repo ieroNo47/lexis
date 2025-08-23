@@ -12,6 +12,14 @@ const (
 	notChecked        // letter has not been checked yet
 )
 
+// map to get string representation of each state
+var states = map[int]string{
+	matched:    "matched",
+	exists:     "exists",
+	notMatched: "notMatched",
+	notChecked: "notChecked",
+}
+
 // match a state to a style
 var stateStyles = map[int]lipgloss.Style{
 	matched:    exactMatchStyle,
