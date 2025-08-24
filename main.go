@@ -6,6 +6,8 @@ import (
 	"os"
 	"slices"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -19,6 +21,8 @@ type model struct {
 	finished bool // whether the game is finished
 	win      bool // whether the game is won
 	log      *log.Logger
+	help     help.Model
+	keys     keyMap
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -43,33 +47,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// size of the parent container adjusted to be the window size - the size of the borders and margins
 		containerStyle = containerStyle.Width(msg.Width - oHorizontal)
+		headerStyle = headerStyle.Width(msg.Width - oHorizontal)
+		resultBarStyle = resultBarStyle.Width(msg.Width - oHorizontal)
+		helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
+		m.help.Width = msg.Width - oHorizontal
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc":
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
-		}
-
-		// If the game is finished, ignore all other key presses
-		if m.finished {
-			if msg.String() == "r" {
-				m.log.Info("==== Restarting game ====")
-				m.grid.reset()
-				m.keyboard.reset()
-				m.finished = false
-				m.win = false
-			}
-			return m, nil
-		}
-
-		switch msg.String() {
-		case "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z":
+		case key.Matches(msg, m.keys.Letter):
 			// if the key is a letter, add it to the grid
 			// https://pkg.go.dev/github.com/charmbracelet/bubbletea@v1.3.6#KeyMsg
 			// Doc: Note that Key.Runes will always contain at least one character, so you can always safely call Key.Runes[0].
-			m.grid.setLetter(msg.Runes[0])
-		case "enter":
+			if !m.finished {
+				m.grid.setLetter(msg.Runes[0])
+			}
+		case key.Matches(msg, m.keys.Delete):
+			// if the key is backspace, delete the last letter
+			if !m.finished {
+				m.grid.deleteLetter()
+			}
+		case key.Matches(msg, m.keys.Restart):
+			m.log.Info("==== Restarting game ====")
+			m.grid.reset()
+			m.keyboard.reset()
+			m.finished = false
+			m.win = false
+			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#8af"))
+			return m, nil
+		case key.Matches(msg, m.keys.Submit):
 			// if row is full, evaluate the row
 			if m.grid.rowFull() {
 				if isMatch(m.answer, m.grid.words[m.grid.rowIndex]) {
@@ -124,11 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-		case "backspace":
-			// if the key is backspace, delete the last letter
-			m.grid.deleteLetter()
 		}
-
 	}
 	// if log level is debug, print the current string in the active row
 	if m.log.GetLevel() == log.DebugLevel {
@@ -142,27 +146,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// status row
-	var statusRow string
+	// todo: Move logit to update header/footer to Update()
+	// header
+	header := headerStyle.Render("lexis")
+	var resultS string
+	// var statusS string
 	if m.finished {
 		if m.win {
-			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#7d7")).Render("You won!", fmt.Sprintf("%d/%d attempts", m.grid.rowIndex+1, len(m.grid.words)))
+			resultS = fmt.Sprintf("You won! %d/%d attempts", m.grid.rowIndex+1, len(m.grid.words))
+			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#7d7"))
 		} else {
-			statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#cc0")).Render("Better luck next time!", fmt.Sprintf("The answer was: %s", string(m.answer)))
+			resultS = fmt.Sprintf("Better luck next time! The answer was: %s", string(m.answer))
+			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#ffcd44ff"))
 		}
-		statusRow = lipgloss.NewStyle().Foreground(lipgloss.Color("#8af")).Render(statusRow + "\nGame Over! Press ctrl+c or Esc to exit, r to restart.")
+		// statusS = "Press ctrl+c or Esc to exit, r to restart."
 	} else {
 		// debug row
-		statusRow = lipgloss.NewStyle().Render(fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
+		resultS = fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
 			m.grid.rowIndex,
 			m.grid.colIndex,
 			len(m.grid.words[m.grid.rowIndex])-1,
 			m.grid.words[m.grid.rowIndex][m.grid.colIndex].r,
-			string(m.answer)))
-
+			string(m.answer))
+		// statusS = "Press Enter to submit, Backspace to delete."
 	}
-	// rows = append(rows, statusRow)
-	view := lipgloss.JoinVertical(lipgloss.Center, m.grid.render(), m.keyboard.render(), statusRow)
+	resultRow := resultBarStyle.Render(resultS)
+	helpRow := helpBarStyle.Render(m.help.View(m.keys))
+	// rows = append(rows, helpRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, header, m.grid.render(), m.keyboard.render(), resultRow, helpRow)
 	return containerStyle.Render(view)
 }
 
@@ -192,6 +203,8 @@ func main() {
 		keyboard: keyboard,
 		answer:   []rune("minty"),
 		log:      logger,
+		help:     newHelp(),
+		keys:     keys,
 	}, tea.WithAltScreen())
 
 	logger.Info("==== Starting lexis ====")

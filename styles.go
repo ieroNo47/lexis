@@ -2,12 +2,11 @@ package main
 
 import "github.com/charmbracelet/lipgloss"
 
+// parent container style
 var containerStyle = lipgloss.NewStyle().
 	Margin(0).
 	Padding(0, 0, 0, 0).
-	Align(lipgloss.Center, lipgloss.Center).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#8af"))
+	Align(lipgloss.Center, lipgloss.Center)
 
 // styles for each state of a letter in the grid
 var defaultStyle = lipgloss.NewStyle().
@@ -41,3 +40,26 @@ var notMatchStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("#444")).
 	Foreground(lipgloss.Color("#444")).
 	Inherit(defaultStyle)
+
+// top bar style
+var headerStyle = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#8af"))
+
+// result bar style
+var resultBarStyle = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#8af"))
+
+// status bar
+var helpBarStyle = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#8af"))
+
+var helpTextStyle = lipgloss.NewStyle()
