@@ -64,7 +64,11 @@ func newGrid(rows, cols int) grid {
 // setLetter sets a letter in the grid at the next available position
 func (g *grid) setLetter(r rune) {
 	if g.rowIndex < len(g.words) && g.colIndex < len(g.words[g.rowIndex]) {
-		g.words[g.rowIndex][g.colIndex].r = r
+		// only set the letter if the current position is empty
+		// prevents overwriting the last letter of the row if it is already set
+		if g.words[g.rowIndex][g.colIndex].r == ' ' {
+			g.words[g.rowIndex][g.colIndex].r = r
+		}
 		// move to the next column if we're not at the end of the row
 		if g.colIndex < len(g.words[g.rowIndex])-1 {
 			g.colIndex++ // move to the next column
