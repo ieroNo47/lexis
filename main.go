@@ -48,7 +48,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// size of the parent container adjusted to be the window size - the size of the borders and margins
 		containerStyle = containerStyle.Width(msg.Width - oHorizontal)
 		headerStyle = headerStyle.Width(msg.Width - oHorizontal)
-		resultBarStyle = resultBarStyle.Width(msg.Width - oHorizontal)
+		resultBarStyleNormal = resultBarStyleNormal.Width(msg.Width - oHorizontal)
+		resultBarStyleWin = resultBarStyleWin.Width(msg.Width - oHorizontal)
+		resultBarStyleLoss = resultBarStyleLoss.Width(msg.Width - oHorizontal)
 		helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
 		m.help.SetWidth(msg.Width - oHorizontal)
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
@@ -74,7 +76,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.keyboard.reset()
 			m.finished = false
 			m.win = false
-			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#8af"))
 			return m, nil
 		case key.Matches(msg, m.keys.Submit):
 			// if row is full, evaluate the row
@@ -149,14 +150,15 @@ func (m model) View() tea.View {
 	// header
 	header := headerStyle.Render("lexis")
 	var resultS string
+	var resultRow string
 	// var statusS string
 	if m.finished {
 		if m.win {
 			resultS = fmt.Sprintf("You won! %d/%d attempts", m.grid.rowIndex+1, len(m.grid.words))
-			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#7d7"))
+			resultRow = resultBarStyleWin.Render(resultS)
 		} else {
 			resultS = fmt.Sprintf("Better luck next time! The answer was: %s", string(m.answer))
-			resultBarStyle = resultBarStyle.Background(lipgloss.Color("#ffcd44ff"))
+			resultRow = resultBarStyleLoss.Render(resultS)
 		}
 		// statusS = "Press ctrl+c or Esc to exit, r to restart."
 	} else {
@@ -167,9 +169,9 @@ func (m model) View() tea.View {
 			len(m.grid.words[m.grid.rowIndex])-1,
 			m.grid.words[m.grid.rowIndex][m.grid.colIndex].r,
 			string(m.answer))
+		resultRow = resultBarStyleNormal.Render(resultS)
 		// statusS = "Press Enter to submit, Backspace to delete."
 	}
-	resultRow := resultBarStyle.Render(resultS)
 	helpRow := helpBarStyle.Render(m.help.View(m.keys))
 	// rows = append(rows, helpRow)
 	view := lipgloss.JoinVertical(lipgloss.Center, header, m.grid.render(), m.keyboard.render(), resultRow, helpRow)

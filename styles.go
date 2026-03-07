@@ -17,28 +17,28 @@ var defaultStyle = lipgloss.NewStyle().
 var activeStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
-	BorderForeground(lipgloss.Color("#8af")).
+	BorderForeground(lipgloss.Color("#88c0d0")).
 	Inherit(defaultStyle)
 
 var exactMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
-	BorderForeground(lipgloss.Color("#7d7")).
-	Foreground(lipgloss.Color("#7d7")).
+	BorderForeground(lipgloss.Color("#a3be8c")).
+	Foreground(lipgloss.Color("#a3be8c")).
 	Inherit(defaultStyle)
 
 var existsMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
-	BorderForeground(lipgloss.Color("#cc0")).
-	Foreground(lipgloss.Color("#cc0")).
+	BorderForeground(lipgloss.Color("#ebcb8b")).
+	Foreground(lipgloss.Color("#ebcb8b")).
 	Inherit(defaultStyle)
 
 var notMatchStyle = lipgloss.NewStyle().
 	Padding(0, 1).
 	Margin(0).
-	BorderForeground(lipgloss.Color("#444")).
-	Foreground(lipgloss.Color("#444")).
+	BorderForeground(lipgloss.Color("#4c566a")).
+	Foreground(lipgloss.Color("#4c566a")).
 	Inherit(defaultStyle)
 
 // top bar style
@@ -46,20 +46,37 @@ var headerStyle = lipgloss.NewStyle().
 	Padding(0).
 	Margin(0).
 	Align(lipgloss.Center).
-	Background(lipgloss.Color("#8af"))
+	Background(lipgloss.Color("#3b4252")).
+	Foreground(lipgloss.Color("#88c0d0"))
 
-// result bar style
-var resultBarStyle = lipgloss.NewStyle().
+// result bar styles
+var resultBarStyleNormal = lipgloss.NewStyle().
 	Padding(0).
 	Margin(0).
 	Align(lipgloss.Center).
-	Background(lipgloss.Color("#8af"))
+	Background(lipgloss.Color("#3b4252")).
+	Foreground(lipgloss.Color("#88c0d0"))
+
+var resultBarStyleWin = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#a3be8c")).
+	Foreground(lipgloss.Color("#2e3440"))
+
+var resultBarStyleLoss = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#ebcb8b")).
+	Foreground(lipgloss.Color("#2e3440"))
 
 // status bar
 var helpBarStyle = lipgloss.NewStyle().
 	Padding(0).
 	Margin(0).
 	Align(lipgloss.Center).
-	Background(lipgloss.Color("#8af"))
+	Background(lipgloss.Color("#3b4252")).
+	Foreground(lipgloss.Color("#88c0d0"))
 
 var helpTextStyle = lipgloss.NewStyle()
