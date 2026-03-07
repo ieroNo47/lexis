@@ -11,7 +11,7 @@ build: lint
     go build -o lexis
 
 # Run the lexis application
-run: lint
+run: 
     go run .
 
 # Install lexis binary to $GOPATH/bin
