@@ -1,7 +1,7 @@
 // grid.go provides the grid data structure and logic for managing letter states and styles
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // consts for states of a letter, matched, exists, not matched
 // currently helps when checking the letter state over different iterations
