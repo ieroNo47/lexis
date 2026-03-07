@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 type position struct {

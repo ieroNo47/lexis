@@ -6,10 +6,10 @@ import (
 	"os"
 	"slices"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/log"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -50,19 +50,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		headerStyle = headerStyle.Width(msg.Width - oHorizontal)
 		resultBarStyle = resultBarStyle.Width(msg.Width - oHorizontal)
 		helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
-		m.help.Width = msg.Width - oHorizontal
+		m.help.SetWidth(msg.Width - oHorizontal)
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.Letter):
 			// if the key is a letter, add it to the grid
-			// https://pkg.go.dev/github.com/charmbracelet/bubbletea@v1.3.6#KeyMsg
-			// Doc: Note that Key.Runes will always contain at least one character, so you can always safely call Key.Runes[0].
-			if !m.finished {
-				m.grid.setLetter(msg.Runes[0])
+			// In v2, msg.Text is a string, get the first rune
+			if !m.finished && len(msg.Text) > 0 {
+				m.grid.setLetter([]rune(msg.Text)[0])
 			}
 		case key.Matches(msg, m.keys.Delete):
 			// if the key is backspace, delete the last letter
@@ -145,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	// todo: Move logit to update header/footer to Update()
 	// header
 	header := headerStyle.Render("lexis")
@@ -174,7 +173,10 @@ func (m model) View() string {
 	helpRow := helpBarStyle.Render(m.help.View(m.keys))
 	// rows = append(rows, helpRow)
 	view := lipgloss.JoinVertical(lipgloss.Center, header, m.grid.render(), m.keyboard.render(), resultRow, helpRow)
-	return containerStyle.Render(view)
+	v := tea.NewView(containerStyle.Render(view))
+	v.WindowTitle = "lexis"
+	v.AltScreen = true
+	return v
 }
 
 func main() {
@@ -205,7 +207,7 @@ func main() {
 		log:      logger,
 		help:     newHelp(),
 		keys:     keys,
-	}, tea.WithAltScreen())
+	})
 
 	logger.Info("==== Starting lexis ====")
 	// run the program

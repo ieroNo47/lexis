@@ -1,6 +1,6 @@
 {
     "name": "Go Development",
-    "image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/go:1.25-bookworm",
     
     "remoteEnv": {
         "GOLANGCI_LINT_VERSION": "v2.1.6",
