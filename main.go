@@ -14,11 +14,10 @@ import (
 )
 
 type model struct {
-	game     game
-	keyboard keyboard
-	log      *log.Logger
-	help     help.Model
-	keys     keyMap
+	game game
+	log  *log.Logger
+	help help.Model
+	keys keyMap
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -62,48 +61,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
 			m.game.reset()
-			m.keyboard.reset()
 			return m, nil
 		case key.Matches(msg, m.keys.Submit):
-			// if row is full, evaluate the row
 			m.game.processSubmit()
-			// if m.grid.rowFull() {
-			// 	// temp slice to keep track of letters that are still to be matched
-			// 	tw := make(tempWord, len(m.answer))
-			// 	copy(tw, m.answer)
-			// 	// first pass: check for exact matches
-			// 	m.log.Debug("== First Pass: Exact Matches ==")
-			// 	for i, l := range m.grid.words[m.grid.rowIndex] {
-			// 		// change style based on match
-			// 		if l.r == m.answer[i] {
-			// 			m.log.Debug("Update", "letter", string(l.r), "index", i, "state", states[matched])
-			// 			m.grid.updateState(m.grid.rowIndex, i, matched) // mark the letter as matched
-			// 			m.keyboard.updateLetterState(l.r, matched)      // update the keyboard state
-			// 			tw = tw.remove(l.r)                             // remove the letter from the temporary word
-			// 		}
-			// 	}
-			// 	// second pass: check for exists matches and not matches
-			// 	// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
-			// 	var targetState = notMatched
-			// 	m.log.Debug("== Second Pass: Exists and Not Matches ==")
-			// 	for i, l := range m.grid.words[m.grid.rowIndex] {
-			// 		if tw.has(l.r) && l.state != matched {
-			// 			targetState = exists
-			// 			m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", states[exists])
-			// 			m.grid.updateState(m.grid.rowIndex, i, exists) // mark the letter as exists
-			// 			tw = tw.remove(l.r)                            // remove the letter from the temporary word
-			// 		} else if l.state != matched {
-			// 			m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", "notMatched")
-			// 			m.grid.updateState(m.grid.rowIndex, i, notMatched) // mark the letter as not matched
-			// 		}
-			// 		if m.keyboard.getLetterState(l.r) != matched { // only update the keyboard state if it is not already matched
-			// 			m.log.Debug("Keyboard Update", "letter", string(l.r), "to", states[targetState], "from", states[m.keyboard.getLetterState(l.r)])
-			// 			m.keyboard.updateLetterState(l.r, targetState)
-			// 		}
-			// 		targetState = notMatched // reset target state
-			// 	}
-			// 	// move to the next row if we're one row before the end
-			// }
 		}
 	}
 	// if log level is debug, print the current string in the active row
@@ -138,7 +98,7 @@ func (m model) View() tea.View {
 		resultRow = resultBarStyleNormal.Render(resultS)
 	}
 	helpRow := helpBarStyle.Render(m.help.View(m.keys))
-	view := lipgloss.JoinVertical(lipgloss.Center, header, m.game.grid.render(), m.keyboard.render(), resultRow, helpRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, header, m.game.grid.render(), m.game.keyboard.render(), resultRow, helpRow)
 	v := tea.NewView(containerStyle.Render(view))
 	v.WindowTitle = "lexis"
 	v.AltScreen = true
@@ -165,11 +125,10 @@ func main() {
 	// create a new bubbletea program with our model
 	answer := []rune("vogue")
 	p := tea.NewProgram(model{
-		game:     newGame(answer, logger),
-		keyboard: newKeyboard(),
-		log:      logger,
-		help:     newHelp(),
-		keys:     keys,
+		game: newGame(answer, logger),
+		log:  logger,
+		help: newHelp(),
+		keys: keys,
 	})
 
 	logger.Info("==== Starting lexis ====")
