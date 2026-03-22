@@ -123,9 +123,9 @@ func main() {
 		Level:           log.DebugLevel,
 	})
 	// create a new bubbletea program with our model
-	answer := []rune("vogue")
+	provider := newRandomAnswerProvider()
 	p := tea.NewProgram(model{
-		game: newGame(answer, logger),
+		game: newGame(provider, logger),
 		log:  logger,
 		help: newHelp(),
 		keys: keys,

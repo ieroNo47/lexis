@@ -24,9 +24,10 @@ type game struct {
 	log      *log.Logger
 }
 
-func newGame(answer []rune, log *log.Logger) game {
+func newGame(ap answerProvider, log *log.Logger) game {
 	grid := newGrid(6, 5)
 	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
+	answer := []rune(ap.getAnswer())
 	return game{
 		grid:     grid,
 		keyboard: newKeyboard(),
