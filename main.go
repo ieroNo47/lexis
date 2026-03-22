@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -15,14 +14,10 @@ import (
 )
 
 type model struct {
-	grid     grid
-	keyboard keyboard
-	answer   []rune
-	finished bool // whether the game is finished
-	win      bool // whether the game is won
-	log      *log.Logger
-	help     help.Model
-	keys     keyMap
+	game game
+	log  *log.Logger
+	help help.Model
+	keys keyMap
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
@@ -60,87 +55,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.Letter):
-			// if the key is a letter, add it to the grid
-			// In v2, msg.Text is a string, get the first rune
-			if !m.finished && len(msg.Text) > 0 {
-				m.grid.setLetter([]rune(msg.Text)[0])
-			}
+			m.game.processLetter(msg.Text)
 		case key.Matches(msg, m.keys.Delete):
-			// if the key is backspace, delete the last letter
-			if !m.finished {
-				m.grid.deleteLetter()
-			}
+			m.game.processDelete()
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
-			m.grid.reset()
-			m.keyboard.reset()
-			m.finished = false
-			m.win = false
+			m.game.reset()
 			return m, nil
 		case key.Matches(msg, m.keys.Submit):
-			// if row is full, evaluate the row
-			if m.grid.rowFull() {
-				if isMatch(m.answer, m.grid.words[m.grid.rowIndex]) {
-					m.log.Info("Match found")
-					m.win = true // mark the game as won
-				}
-				// temp slice to keep track of letters that are still to be matched
-				tw := make(tempWord, len(m.answer))
-				copy(tw, m.answer)
-				// first pass: check for exact matches
-				m.log.Debug("== First Pass: Exact Matches ==")
-				for i, l := range m.grid.words[m.grid.rowIndex] {
-					// change style based on match
-					if l.r == m.answer[i] {
-						m.log.Debug("Update", "letter", string(l.r), "index", i, "state", states[matched])
-						m.grid.updateState(m.grid.rowIndex, i, matched) // mark the letter as matched
-						m.keyboard.updateLetterState(l.r, matched)      // update the keyboard state
-						tw = tw.remove(l.r)                             // remove the letter from the temporary word
-					}
-				}
-				// second pass: check for exists matches and not matches
-				// having a separate pass for exists matches allows us to not mark a letter as exists if it was already matched
-				var targetState = notMatched
-				m.log.Debug("== Second Pass: Exists and Not Matches ==")
-				for i, l := range m.grid.words[m.grid.rowIndex] {
-					if tw.has(l.r) && l.state != matched {
-						targetState = exists
-						m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", states[exists])
-						m.grid.updateState(m.grid.rowIndex, i, exists) // mark the letter as exists
-						tw = tw.remove(l.r)                            // remove the letter from the temporary word
-					} else if l.state != matched {
-						m.log.Debug("Row Update", "letter", string(l.r), "index", i, "state", "notMatched")
-						m.grid.updateState(m.grid.rowIndex, i, notMatched) // mark the letter as not matched
-					}
-					if m.keyboard.getLetterState(l.r) != matched { // only update the keyboard state if it is not already matched
-						m.log.Debug("Keyboard Update", "letter", string(l.r), "to", states[targetState], "from", states[m.keyboard.getLetterState(l.r)])
-						m.keyboard.updateLetterState(l.r, targetState)
-					}
-					targetState = notMatched // reset target state
-				}
-				// move to the next row if we're one row before the end
-
-				if m.win {
-					// if the game is won, mark it as finished
-					m.log.Debug("Marking game as finished.", "reason", "win")
-					m.finished = true
-				} else {
-					rowChanged := m.grid.goToNextRow()
-					if !rowChanged {
-						m.log.Debug("Marking game as finished.", "reason", "no more rows")
-						m.finished = true // mark the game as finished if there are no more rows
-					}
-				}
-			}
+			m.game.processSubmit()
 		}
 	}
 	// if log level is debug, print the current string in the active row
 	if m.log.GetLevel() == log.DebugLevel {
-		var currentRow string
-		for _, l := range m.grid.words[m.grid.rowIndex] {
-			currentRow += string(l.r)
-		}
-		m.log.Debug("", "row", m.grid.rowIndex, "col", m.grid.colIndex, "string", currentRow)
+		rowIndex, colIndex, rowString := m.game.debugState()
+		m.log.Debug("", "row", rowIndex, "col", colIndex, "string", rowString)
 	}
 	return m, nil
 }
@@ -151,30 +80,25 @@ func (m model) View() tea.View {
 	header := headerStyle.Render("lexis")
 	var resultS string
 	var resultRow string
-	// var statusS string
-	if m.finished {
-		if m.win {
-			resultS = fmt.Sprintf("You won! %d/%d attempts", m.grid.rowIndex+1, len(m.grid.words))
-			resultRow = resultBarStyleWin.Render(resultS)
-		} else {
-			resultS = fmt.Sprintf("Better luck next time! The answer was: %s", string(m.answer))
-			resultRow = resultBarStyleLoss.Render(resultS)
-		}
-		// statusS = "Press ctrl+c or Esc to exit, r to restart."
+	rowIndex, colIndex, _ := m.game.debugState()
+	if m.game.isWon() {
+		resultS = fmt.Sprintf("You won! %d/%d attempts", rowIndex+1, len(m.game.grid.words))
+		resultRow = resultBarStyleWin.Render(resultS)
+	} else if m.game.isLost() {
+		resultS = fmt.Sprintf("Better luck next time! The answer was: %s", m.game.Answer())
+		resultRow = resultBarStyleLoss.Render(resultS)
 	} else {
 		// debug row
 		resultS = fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
-			m.grid.rowIndex,
-			m.grid.colIndex,
-			len(m.grid.words[m.grid.rowIndex])-1,
-			m.grid.words[m.grid.rowIndex][m.grid.colIndex].r,
-			string(m.answer))
+			rowIndex,
+			colIndex,
+			len(m.game.grid.words[rowIndex])-1,
+			m.game.grid.words[rowIndex][colIndex].r,
+			m.game.Answer())
 		resultRow = resultBarStyleNormal.Render(resultS)
-		// statusS = "Press Enter to submit, Backspace to delete."
 	}
 	helpRow := helpBarStyle.Render(m.help.View(m.keys))
-	// rows = append(rows, helpRow)
-	view := lipgloss.JoinVertical(lipgloss.Center, header, m.grid.render(), m.keyboard.render(), resultRow, helpRow)
+	view := lipgloss.JoinVertical(lipgloss.Center, header, m.game.grid.render(), m.game.keyboard.render(), resultRow, helpRow)
 	v := tea.NewView(containerStyle.Render(view))
 	v.WindowTitle = "lexis"
 	v.AltScreen = true
@@ -182,10 +106,10 @@ func (m model) View() tea.View {
 }
 
 func main() {
-	// if err := os.Remove("debug.log"); err != nil && !os.IsNotExist(err) {
-	// 	fmt.Println("fatal:", err)
-	// 	os.Exit(1)
-	// }
+	if err := os.Remove("debug.log"); err != nil && !os.IsNotExist(err) {
+		fmt.Println("fatal:", err)
+		os.Exit(1)
+	}
 	// create a logger that writes to a file
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
@@ -199,16 +123,12 @@ func main() {
 		Level:           log.DebugLevel,
 	})
 	// create a new bubbletea program with our model
-	grid := newGrid(6, 5)
-	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
-	keyboard := newKeyboard()
+	answer := []rune("vogue")
 	p := tea.NewProgram(model{
-		grid:     grid,
-		keyboard: keyboard,
-		answer:   []rune("minty"),
-		log:      logger,
-		help:     newHelp(),
-		keys:     keys,
+		game: newGame(answer, logger),
+		log:  logger,
+		help: newHelp(),
+		keys: keys,
 	})
 
 	logger.Info("==== Starting lexis ====")
@@ -216,30 +136,4 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		panic(err)
 	}
-}
-
-func isMatch(answer []rune, guess word) bool {
-	for i, l := range guess {
-		if l.r != answer[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// tempWord is a slice alias for []rune that provides methods to check for existence and remove letters.
-// Used to keep track of letters that are still to be matched.
-type tempWord []rune
-
-func (tw tempWord) has(r rune) bool {
-	return slices.Contains(tw, r)
-}
-
-func (tw tempWord) remove(r rune) tempWord {
-	for i, tr := range tw {
-		if tr == r {
-			return slices.Delete(tw, i, i+1)
-		}
-	}
-	return tw
 }
