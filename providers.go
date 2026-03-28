@@ -1,7 +1,10 @@
 // providers defines the answer providers interface and implementations
 package main
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
 
 // answerProvider is an interface that defines a method to get the answer for the game
 type answerProvider interface {
@@ -28,6 +31,7 @@ type randomAnswerProvider struct {
 }
 
 func (p randomAnswerProvider) getAnswer() string {
+	time.Sleep(5 * time.Second) // simulate loading time
 	return p.answers[rand.Intn(len(p.answers))]
 }
 

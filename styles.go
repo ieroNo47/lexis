@@ -71,6 +71,13 @@ var resultBarStyleLoss = lipgloss.NewStyle().
 	Background(lipgloss.Color("#ebcb8b")).
 	Foreground(lipgloss.Color("#2e3440"))
 
+var resultBarStyleLoading = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#b48ead")).
+	Foreground(lipgloss.Color("#2e3440"))
+
 // status bar
 var helpBarStyle = lipgloss.NewStyle().
 	Padding(0).

@@ -14,21 +14,37 @@ import (
 )
 
 type model struct {
-	game game
-	log  *log.Logger
-	help help.Model
-	keys keyMap
+	game           game
+	log            *log.Logger
+	help           help.Model
+	keys           keyMap
+	loading        bool
+	answerProvider answerProvider
+}
+
+// initCompleteMsg is a message that is sent when the game initialization is complete and the answer is ready
+type initCompleteMsg struct {
+	answer string
 }
 
 // write empty versions of init update and view functions required for our bubbletea model
 func (m model) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		m.log.Debug("[Init]")
+		answer := m.answerProvider.getAnswer()
+		return initCompleteMsg{answer}
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
 	m.log.Debug("[Update]", "msg", spew.Sdump(msg))
 	switch msg := msg.(type) {
+	case initCompleteMsg:
+		m.log.Debug("Initialization complete")
+		m.game.start(msg.answer)
+		m.loading = false
+		return m, nil
 	case tea.WindowSizeMsg:
 		// oVertical := containerStyle.GetBorderTopSize() +
 		// 	containerStyle.GetBorderBottomSize() +
@@ -46,6 +62,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		resultBarStyleNormal = resultBarStyleNormal.Width(msg.Width - oHorizontal)
 		resultBarStyleWin = resultBarStyleWin.Width(msg.Width - oHorizontal)
 		resultBarStyleLoss = resultBarStyleLoss.Width(msg.Width - oHorizontal)
+		resultBarStyleLoading = resultBarStyleLoading.Width(msg.Width - oHorizontal)
 		helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
 		m.help.SetWidth(msg.Width - oHorizontal)
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
@@ -75,18 +92,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
-	// todo: Move logit to update header/footer to Update()
+	// todo: Move logic to update header/footer to Update()
 	// header
 	header := headerStyle.Render("lexis")
 	var resultS string
 	var resultRow string
 	rowIndex, colIndex, _ := m.game.debugState()
 	if m.game.isWon() {
-		resultS = fmt.Sprintf("You won! %d/%d attempts", rowIndex+1, len(m.game.grid.words))
+		resultS = fmt.Sprintf("You won in %d/%d attempts!", rowIndex+1, len(m.game.grid.words))
 		resultRow = resultBarStyleWin.Render(resultS)
 	} else if m.game.isLost() {
 		resultS = fmt.Sprintf("Better luck next time! The answer was: %s", m.game.Answer())
 		resultRow = resultBarStyleLoss.Render(resultS)
+	} else if m.loading {
+		resultS = "LOADING..."
+		resultRow = resultBarStyleLoading.Render(resultS)
 	} else {
 		// debug row
 		resultS = fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
@@ -98,7 +118,12 @@ func (m model) View() tea.View {
 		resultRow = resultBarStyleNormal.Render(resultS)
 	}
 	helpRow := helpBarStyle.Render(m.help.View(m.keys))
-	view := lipgloss.JoinVertical(lipgloss.Center, header, m.game.grid.render(), m.game.keyboard.render(), resultRow, helpRow)
+	view := lipgloss.JoinVertical(lipgloss.Center,
+		header,
+		m.game.grid.render(),
+		m.game.keyboard.render(),
+		resultRow,
+		helpRow)
 	v := tea.NewView(containerStyle.Render(view))
 	v.WindowTitle = "lexis"
 	v.AltScreen = true
@@ -125,10 +150,12 @@ func main() {
 	// create a new bubbletea program with our model
 	provider := newRandomAnswerProvider()
 	p := tea.NewProgram(model{
-		game: newGame(provider, logger),
-		log:  logger,
-		help: newHelp(),
-		keys: keys,
+		game:           newGame(logger),
+		log:            logger,
+		help:           newHelp(),
+		keys:           keys,
+		loading:        true,
+		answerProvider: provider,
 	})
 
 	logger.Info("==== Starting lexis ====")
