@@ -42,7 +42,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case initCompleteMsg:
 		m.log.Debug("Initialization complete")
-		m.game.start(msg.answer)
+		m.game.init(msg.answer)
 		m.loading = false
 		return m, nil
 	case tea.WindowSizeMsg:

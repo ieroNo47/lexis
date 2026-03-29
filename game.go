@@ -66,7 +66,7 @@ func (g game) Answer() string {
 	return string(g.answer)
 }
 
-func (g *game) start(answer string) {
+func (g *game) init(answer string) {
 	g.log.Debug("== Starting Game ==")
 	g.answer = []rune(answer)
 	g.log.Debug("Answer", "answer", string(g.answer))
