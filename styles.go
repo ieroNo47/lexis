@@ -1,6 +1,9 @@
 package main
 
-import "charm.land/lipgloss/v2"
+import (
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+)
 
 // parent container style
 var containerStyle = lipgloss.NewStyle().
@@ -87,3 +90,25 @@ var helpBarStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("#88c0d0"))
 
 var helpTextStyle = lipgloss.NewStyle()
+
+func updateStyles(msg tea.WindowSizeMsg) int {
+	// oVertical := containerStyle.GetBorderTopSize() +
+	// 	containerStyle.GetBorderBottomSize() +
+	// 	containerStyle.GetMarginTop() +
+	// 	containerStyle.GetMarginBottom()
+
+	oHorizontal := containerStyle.GetBorderLeftSize() +
+		containerStyle.GetBorderRightSize() +
+		containerStyle.GetMarginLeft() +
+		containerStyle.GetMarginRight()
+
+	// size of the parent container adjusted to be the window size - the size of the borders and margins
+	containerStyle = containerStyle.Width(msg.Width - oHorizontal)
+	headerStyle = headerStyle.Width(msg.Width - oHorizontal)
+	resultBarStyleNormal = resultBarStyleNormal.Width(msg.Width - oHorizontal)
+	resultBarStyleWin = resultBarStyleWin.Width(msg.Width - oHorizontal)
+	resultBarStyleLoss = resultBarStyleLoss.Width(msg.Width - oHorizontal)
+	resultBarStyleLoading = resultBarStyleLoading.Width(msg.Width - oHorizontal)
+	helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
+	return oHorizontal
+}
