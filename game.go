@@ -9,7 +9,8 @@ import (
 
 const (
 	// game states
-	playing = iota
+	loading = iota
+	playing
 	won
 	lost
 )
@@ -19,19 +20,18 @@ type game struct {
 	keyboard keyboard
 	answer   []rune
 	state    int
-	rowState []letter
 	tempWord tempWord
 	log      *log.Logger
 }
 
-func newGame(answer []rune, log *log.Logger) game {
+func newGame(log *log.Logger) game {
 	grid := newGrid(6, 5)
 	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
 	return game{
 		grid:     grid,
 		keyboard: newKeyboard(),
-		answer:   answer,
-		state:    playing,
+		answer:   []rune{},
+		state:    loading,
 		log:      log,
 	}
 }
@@ -54,22 +54,33 @@ func (g game) isWon() bool {
 	return g.state == won
 }
 
-func (g game) isOver() bool {
-	return g.state == won || g.state == lost
+// func (g game) isOver() bool {
+// 	return g.state == won || g.state == lost
+// }
+
+func (g game) inProgress() bool {
+	return g.state == playing
 }
 
 func (g game) Answer() string {
 	return string(g.answer)
 }
 
+func (g *game) init(answer string) {
+	g.log.Debug("== Starting Game ==")
+	g.answer = []rune(answer)
+	g.log.Debug("Answer", "answer", string(g.answer))
+	g.state = playing
+}
+
 func (g *game) processLetter(text string) {
-	if !g.isOver() && len(text) > 0 {
+	if g.inProgress() && len(text) > 0 {
 		g.grid.setLetter([]rune(text)[0])
 	}
 }
 
 func (g *game) processDelete() {
-	if !g.isOver() {
+	if g.inProgress() {
 		g.grid.deleteLetter()
 	}
 }
