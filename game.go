@@ -62,6 +62,18 @@ func (g game) inProgress() bool {
 	return g.state == playing
 }
 
+func (g game) rowReady() bool {
+	return g.grid.rowFull()
+}
+
+func (g game) rowString() string {
+	var rowString string
+	for _, l := range g.grid.words[g.grid.rowIndex] {
+		rowString += string(l.r)
+	}
+	return rowString
+}
+
 func (g game) Answer() string {
 	return string(g.answer)
 }

@@ -81,6 +81,13 @@ var resultBarStyleLoading = lipgloss.NewStyle().
 	Background(lipgloss.Color("#b48ead")).
 	Foreground(lipgloss.Color("#2e3440"))
 
+var resultBarStyleError = lipgloss.NewStyle().
+	Padding(0).
+	Margin(0).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("#bf616a")).
+	Foreground(lipgloss.Color("#2e3440"))
+
 // status bar
 var helpBarStyle = lipgloss.NewStyle().
 	Padding(0).
@@ -109,6 +116,7 @@ func updateStyles(msg tea.WindowSizeMsg) int {
 	resultBarStyleWin = resultBarStyleWin.Width(msg.Width - oHorizontal)
 	resultBarStyleLoss = resultBarStyleLoss.Width(msg.Width - oHorizontal)
 	resultBarStyleLoading = resultBarStyleLoading.Width(msg.Width - oHorizontal)
+	resultBarStyleError = resultBarStyleError.Width(msg.Width - oHorizontal)
 	helpBarStyle = helpBarStyle.Width(msg.Width - oHorizontal)
 	return oHorizontal
 }
