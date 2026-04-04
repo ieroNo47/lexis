@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"charm.land/bubbles/v2/help"
@@ -21,19 +22,16 @@ const (
 )
 
 type model struct {
-	game           game
-	log            *log.Logger
-	help           help.Model
-	keys           keyMap
-	state          int
-	answerProvider answerProvider
-	spinner        spinner.Model
+	game    game
+	log     *log.Logger
+	help    help.Model
+	keys    keyMap
+	state   int
+	spinner spinner.Model
 }
 
 // initCompleteMsg is a message that is sent when the game initialization is complete and the answer is ready
-type initCompleteMsg struct {
-	answer string
-}
+type initCompleteMsg bool
 
 // rowNotFullMsg is a message that is sent when the user tries to submit a guess but the current row is not full
 type rowNotFullMsg bool
@@ -41,6 +39,7 @@ type rowNotFullMsg bool
 // invalidWordMsg is a message that is sent when the user tries to submit a guess but the word is not valid
 type invalidWordMsg bool
 
+// validWordMsg is a message that is sent when the user submits a valid guess
 type validWordMsg bool
 
 // Init initializes the model and starts the game by getting the answer from the answer provider
@@ -51,8 +50,8 @@ func (m model) Init() tea.Cmd {
 
 	answerCmd := func() tea.Msg {
 		m.log.Debug("[Init]")
-		answer := m.answerProvider.getAnswer()
-		return initCompleteMsg{answer}
+		m.game.initProvider()
+		return initCompleteMsg(true)
 	}
 	cmds = append(cmds, answerCmd)
 	return tea.Batch(cmds...)
@@ -64,7 +63,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case initCompleteMsg:
 		m.log.Debug("Initialization complete")
-		m.game.init(msg.answer)
+		m.game.start()
 		m.state = statePlaying
 		return m, nil
 	case tea.WindowSizeMsg:
@@ -80,32 +79,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state != stateLoading {
 				m.state = statePlaying
 				m.game.processLetter(msg.Text)
+			} else {
+				m.log.Info("Cannot enter letters while loading")
 			}
 		case key.Matches(msg, m.keys.Delete):
 			if m.state != stateLoading {
 				m.state = statePlaying
 				m.game.processDelete()
+			} else {
+				m.log.Info("Cannot delete while loading")
 			}
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
 			m.game.reset()
 		case key.Matches(msg, m.keys.Submit):
-			cmds := []tea.Cmd{}
-			if m.game.rowReady() {
-				m.state = stateLoading
-				cmds = append(cmds, m.spinner.Tick)
-				cmds = append(cmds, func() tea.Msg {
-					if m.answerProvider.validWord(m.game.rowString()) {
-						return validWordMsg(true)
-					} else {
+			cmds := []tea.Cmd{m.spinner.Tick}
+			m.state = stateLoading
+			submitCmd := func() tea.Msg {
+				err := m.game.processSubmit()
+				if err != nil {
+					if errors.Is(err, ErrRowNotFull) {
+						return rowNotFullMsg(true)
+					} else if errors.Is(err, ErrInvalidWord) {
 						return invalidWordMsg(true)
 					}
-				})
-			} else {
-				cmds = append(cmds, func() tea.Msg {
-					return rowNotFullMsg(true)
-				})
+				}
+				return validWordMsg(true)
 			}
+			cmds = append(cmds, submitCmd)
 			return m, tea.Batch(cmds...)
 		}
 	case spinner.TickMsg:
@@ -122,7 +123,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case validWordMsg:
 		m.state = statePlaying
-		m.game.processSubmit()
 	default:
 		// if log level is debug, print the current string in the active row
 		if m.log.GetLevel() == log.DebugLevel {
@@ -182,12 +182,11 @@ func newModel(logger *log.Logger) model {
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	return model{
-		game:           newGame(logger),
-		log:            logger,
-		help:           newHelp(),
-		keys:           keys,
-		state:          stateLoading,
-		answerProvider: provider,
-		spinner:        s,
+		game:    newGame(provider, logger),
+		log:     logger,
+		help:    newHelp(),
+		keys:    keys,
+		state:   stateLoading,
+		spinner: s,
 	}
 }
