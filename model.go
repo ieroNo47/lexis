@@ -41,6 +41,8 @@ type rowNotFullMsg bool
 // invalidWordMsg is a message that is sent when the user tries to submit a guess but the word is not valid
 type invalidWordMsg bool
 
+type validWordMsg bool
+
 // Init initializes the model and starts the game by getting the answer from the answer provider
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
@@ -75,31 +77,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.Letter):
-			m.game.processLetter(msg.Text)
-			m.state = statePlaying
-			return m, nil
+			if m.state != stateLoading {
+				m.state = statePlaying
+				m.game.processLetter(msg.Text)
+			}
 		case key.Matches(msg, m.keys.Delete):
-			m.state = statePlaying
-			m.game.processDelete()
+			if m.state != stateLoading {
+				m.state = statePlaying
+				m.game.processDelete()
+			}
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
 			m.game.reset()
-			return m, nil
 		case key.Matches(msg, m.keys.Submit):
+			cmds := []tea.Cmd{}
 			if m.game.rowReady() {
-				if m.answerProvider.validWord(m.game.rowString()) {
-					m.game.processSubmit()
-				} else {
-					return m, func() tea.Msg {
+				m.state = stateLoading
+				cmds = append(cmds, m.spinner.Tick)
+				cmds = append(cmds, func() tea.Msg {
+					if m.answerProvider.validWord(m.game.rowString()) {
+						return validWordMsg(true)
+					} else {
 						return invalidWordMsg(true)
 					}
-				}
+				})
 			} else {
-				return m, func() tea.Msg {
+				cmds = append(cmds, func() tea.Msg {
 					return rowNotFullMsg(true)
-				}
+				})
 			}
-			m.game.processSubmit()
+			return m, tea.Batch(cmds...)
 		}
 	case spinner.TickMsg:
 		if m.state == stateLoading {
@@ -113,6 +120,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case invalidWordMsg:
 		m.state = stateInvalidWord
 		return m, nil
+	case validWordMsg:
+		m.state = statePlaying
+		m.game.processSubmit()
 	default:
 		// if log level is debug, print the current string in the active row
 		if m.log.GetLevel() == log.DebugLevel {

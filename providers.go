@@ -39,6 +39,7 @@ func (p randomAnswerProvider) getAnswer() string {
 }
 
 func (p randomAnswerProvider) validWord(word string) bool {
+	time.Sleep(3 * time.Second) // simulate delay
 	return slices.Contains(p.answers, word)
 }
 
