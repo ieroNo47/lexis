@@ -61,20 +61,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
 	m.log.Debug("[Update]", "msg", spew.Sdump(msg))
 	switch msg := msg.(type) {
+	// === INIT ===
 	case initCompleteMsg:
 		m.log.Debug("Initialization complete")
 		m.game.start()
 		m.state = statePlaying
 		return m, nil
+	// === WINDOW RESIZE ===
 	case tea.WindowSizeMsg:
 		oHorizontal := updateStyles(msg)
 		m.help.SetWidth(msg.Width - oHorizontal)
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
 	case tea.KeyPressMsg:
 		switch {
+		// === QUIT ===
 		case key.Matches(msg, m.keys.Quit):
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
+		// === LETTERS ===
 		case key.Matches(msg, m.keys.Letter):
 			if m.state != stateLoading {
 				m.state = statePlaying
@@ -82,6 +86,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.log.Info("Cannot enter letters while loading")
 			}
+		// === DELETE ===
 		case key.Matches(msg, m.keys.Delete):
 			if m.state != stateLoading {
 				m.state = statePlaying
@@ -89,14 +94,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.log.Info("Cannot delete while loading")
 			}
+		// === RESTART ===
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
 			m.game.reset()
+		// === SUBMIT ===
 		case key.Matches(msg, m.keys.Submit):
 			cmds := []tea.Cmd{m.spinner.Tick}
 			m.state = stateLoading
 			submitCmd := func() tea.Msg {
-				err := m.game.processSubmit()
+				err := m.game.rowReady()
 				if err != nil {
 					if errors.Is(err, ErrRowNotFull) {
 						return rowNotFullMsg(true)
@@ -109,12 +116,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, submitCmd)
 			return m, tea.Batch(cmds...)
 		}
+	// === SPINNER TICK ===
 	case spinner.TickMsg:
 		if m.state == stateLoading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
+	// === SUBMIT RESULTS ===
 	case rowNotFullMsg:
 		m.state = stateRowNotFull
 		return m, nil
@@ -123,6 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case validWordMsg:
 		m.state = statePlaying
+		m.game.Submit()
 	default:
 		// if log level is debug, print the current string in the active row
 		if m.log.GetLevel() == log.DebugLevel {

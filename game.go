@@ -67,10 +67,6 @@ func (g game) inProgress() bool {
 	return g.state == playing
 }
 
-func (g game) rowReady() bool {
-	return g.grid.rowFull()
-}
-
 func (g game) rowString() string {
 	var rowString string
 	for _, l := range g.grid.words[g.grid.rowIndex] {
@@ -109,7 +105,9 @@ func (g *game) processDelete() {
 	}
 }
 
-func (g *game) processSubmit() error {
+// rowReady checks if the current row is ready to be submitted and returns an error if it is not
+// may perform I/O operations such as validating the word with the answer provider, so it should be called in a separate goroutine to avoid blocking the UI
+func (g *game) rowReady() error {
 	if !g.grid.rowFull() {
 		g.log.Info("Row is not full, cannot submit")
 		return fmt.Errorf("cannot submit: %w", ErrRowNotFull)
@@ -118,6 +116,12 @@ func (g *game) processSubmit() error {
 		g.log.Info("Invalid word submitted", "word", g.rowString())
 		return fmt.Errorf("cannot submit: %w", ErrInvalidWord)
 	}
+	return nil
+}
+
+// Submit processes current row and updates letter states based on the answer.
+// It also updates the game state to won or lost if applicable.
+func (g *game) Submit() {
 	if g.isMatch() {
 		g.log.Info("Match found")
 		g.state = won // mark the game as won
@@ -126,7 +130,7 @@ func (g *game) processSubmit() error {
 			g.grid.updateState(g.grid.rowIndex, i, matched)
 			g.keyboard.updateLetterState(l.r, matched) // update the keyboard state
 		}
-		return nil
+		return
 	}
 	tw := newTempWord(g.answer)
 	// first pass: check for exact matches
@@ -168,7 +172,6 @@ func (g *game) processSubmit() error {
 		g.log.Debug("Marking game as finished.", "reason", "no more rows")
 		// TODO: return as custom error to handle in model?
 	}
-	return nil
 }
 
 func (g *game) reset() {

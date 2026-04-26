@@ -4,7 +4,6 @@ package main
 import (
 	"math/rand"
 	"slices"
-	"time"
 )
 
 // answerProvider is an interface that defines a method to get the answer for the game
@@ -36,7 +35,7 @@ type randomAnswerProvider struct {
 }
 
 func (p *randomAnswerProvider) init() {
-	time.Sleep(2 * time.Second) // simulate loading time
+	// time.Sleep(2 * time.Second) // simulate loading time
 	p.answer = p.words[rand.Intn(len(p.words))]
 }
 
@@ -45,7 +44,7 @@ func (p randomAnswerProvider) getAnswer() string {
 }
 
 func (p randomAnswerProvider) validWord(word string) bool {
-	time.Sleep(3 * time.Second) // simulate delay
+	// time.Sleep(2 * time.Second) // simulate delay
 	return slices.Contains(p.words, word)
 }
 
