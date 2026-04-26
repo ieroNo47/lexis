@@ -4,11 +4,11 @@ package main
 import (
 	"math/rand"
 	"slices"
-	"time"
 )
 
 // answerProvider is an interface that defines a method to get the answer for the game
 type answerProvider interface {
+	init()
 	getAnswer() string
 	validWord(word string) bool
 }
@@ -30,21 +30,26 @@ func newStaticAnswerProvider() staticAnswerProvider {
 
 // randomAnswerProvider is an implementation of answerProvider that returns a random answer from a static list of answers
 type randomAnswerProvider struct {
-	answers []string
+	answer string
+	words  []string
+}
+
+func (p *randomAnswerProvider) init() {
+	// time.Sleep(2 * time.Second) // simulate loading time
+	p.answer = p.words[rand.Intn(len(p.words))]
 }
 
 func (p randomAnswerProvider) getAnswer() string {
-	time.Sleep(1 * time.Second) // simulate loading time
-	return p.answers[rand.Intn(len(p.answers))]
+	return p.answer
 }
 
 func (p randomAnswerProvider) validWord(word string) bool {
-	time.Sleep(3 * time.Second) // simulate delay
-	return slices.Contains(p.answers, word)
+	// time.Sleep(2 * time.Second) // simulate delay
+	return slices.Contains(p.words, word)
 }
 
-func newRandomAnswerProvider() randomAnswerProvider {
-	return randomAnswerProvider{
-		answers: []string{"apple", "grape", "peach", "mango", "berry", "lemon", "pearl"},
+func newRandomAnswerProvider() *randomAnswerProvider {
+	return &randomAnswerProvider{
+		words: []string{"apple", "grape", "peach", "mango", "berry", "lemon", "pearl"},
 	}
 }

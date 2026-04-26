@@ -2,6 +2,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/charmbracelet/log"
@@ -15,24 +17,31 @@ const (
 	lost
 )
 
+var (
+	ErrInvalidWord = errors.New("invalid word")
+	ErrRowNotFull  = errors.New("row not full")
+)
+
 type game struct {
-	grid     grid
-	keyboard keyboard
-	answer   []rune
-	state    int
-	tempWord tempWord
-	log      *log.Logger
+	grid           grid
+	keyboard       keyboard
+	answerProvider answerProvider
+	answer         []rune
+	state          int
+	tempWord       tempWord
+	log            *log.Logger
 }
 
-func newGame(log *log.Logger) game {
+func newGame(ap answerProvider, log *log.Logger) game {
 	grid := newGrid(6, 5)
 	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
 	return game{
-		grid:     grid,
-		keyboard: newKeyboard(),
-		answer:   []rune{},
-		state:    loading,
-		log:      log,
+		grid:           grid,
+		keyboard:       newKeyboard(),
+		answerProvider: ap,
+		answer:         []rune{},
+		state:          loading,
+		log:            log,
 	}
 }
 
@@ -54,16 +63,8 @@ func (g game) isWon() bool {
 	return g.state == won
 }
 
-// func (g game) isOver() bool {
-// 	return g.state == won || g.state == lost
-// }
-
 func (g game) inProgress() bool {
 	return g.state == playing
-}
-
-func (g game) rowReady() bool {
-	return g.grid.rowFull()
 }
 
 func (g game) rowString() string {
@@ -78,8 +79,15 @@ func (g game) Answer() string {
 	return string(g.answer)
 }
 
-func (g *game) init(answer string) {
+func (g *game) initProvider() {
+	g.log.Debug("Initializing answer provider")
+	g.answerProvider.init()
+	g.log.Debug("Answer provider initialized")
+}
+
+func (g *game) start() {
 	g.log.Debug("== Starting Game ==")
+	answer := g.answerProvider.getAnswer()
 	g.answer = []rune(answer)
 	g.log.Debug("Answer", "answer", string(g.answer))
 	g.state = playing
@@ -97,11 +105,23 @@ func (g *game) processDelete() {
 	}
 }
 
-func (g *game) processSubmit() {
+// rowReady checks if the current row is ready to be submitted and returns an error if it is not
+// may perform I/O operations such as validating the word with the answer provider, so it should be called in a separate goroutine to avoid blocking the UI
+func (g *game) rowReady() error {
 	if !g.grid.rowFull() {
 		g.log.Info("Row is not full, cannot submit")
-		return
+		return fmt.Errorf("cannot submit: %w", ErrRowNotFull)
 	}
+	if !g.answerProvider.validWord(g.rowString()) {
+		g.log.Info("Invalid word submitted", "word", g.rowString())
+		return fmt.Errorf("cannot submit: %w", ErrInvalidWord)
+	}
+	return nil
+}
+
+// Submit processes current row and updates letter states based on the answer.
+// It also updates the game state to won or lost if applicable.
+func (g *game) Submit() {
 	if g.isMatch() {
 		g.log.Info("Match found")
 		g.state = won // mark the game as won
@@ -150,6 +170,7 @@ func (g *game) processSubmit() {
 	} else {
 		g.state = lost // mark the game as lost if there are no more rows
 		g.log.Debug("Marking game as finished.", "reason", "no more rows")
+		// TODO: return as custom error to handle in model?
 	}
 }
 

@@ -94,7 +94,8 @@ var helpBarStyle = lipgloss.NewStyle().
 	Margin(0).
 	Align(lipgloss.Center).
 	Background(lipgloss.Color("#3b4252")).
-	Foreground(lipgloss.Color("#88c0d0"))
+	Foreground(lipgloss.Color("#88c0d0")).
+	Faint(true)
 
 var helpTextStyle = lipgloss.NewStyle()
 

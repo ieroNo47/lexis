@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"charm.land/bubbles/v2/help"
@@ -21,19 +22,16 @@ const (
 )
 
 type model struct {
-	game           game
-	log            *log.Logger
-	help           help.Model
-	keys           keyMap
-	state          int
-	answerProvider answerProvider
-	spinner        spinner.Model
+	game    game
+	log     *log.Logger
+	help    help.Model
+	keys    keyMap
+	state   int
+	spinner spinner.Model
 }
 
 // initCompleteMsg is a message that is sent when the game initialization is complete and the answer is ready
-type initCompleteMsg struct {
-	answer string
-}
+type initCompleteMsg bool
 
 // rowNotFullMsg is a message that is sent when the user tries to submit a guess but the current row is not full
 type rowNotFullMsg bool
@@ -41,6 +39,7 @@ type rowNotFullMsg bool
 // invalidWordMsg is a message that is sent when the user tries to submit a guess but the word is not valid
 type invalidWordMsg bool
 
+// validWordMsg is a message that is sent when the user submits a valid guess
 type validWordMsg bool
 
 // Init initializes the model and starts the game by getting the answer from the answer provider
@@ -51,8 +50,8 @@ func (m model) Init() tea.Cmd {
 
 	answerCmd := func() tea.Msg {
 		m.log.Debug("[Init]")
-		answer := m.answerProvider.getAnswer()
-		return initCompleteMsg{answer}
+		m.game.initProvider()
+		return initCompleteMsg(true)
 	}
 	cmds = append(cmds, answerCmd)
 	return tea.Batch(cmds...)
@@ -62,58 +61,69 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmd tea.Cmd
 	m.log.Debug("[Update]", "msg", spew.Sdump(msg))
 	switch msg := msg.(type) {
+	// === INIT ===
 	case initCompleteMsg:
 		m.log.Debug("Initialization complete")
-		m.game.init(msg.answer)
+		m.game.start()
 		m.state = statePlaying
 		return m, nil
+	// === WINDOW RESIZE ===
 	case tea.WindowSizeMsg:
 		oHorizontal := updateStyles(msg)
 		m.help.SetWidth(msg.Width - oHorizontal)
 		m.log.Debug("Window resized", "width", msg.Width, "height", msg.Height)
 	case tea.KeyPressMsg:
 		switch {
+		// === QUIT ===
 		case key.Matches(msg, m.keys.Quit):
 			m.log.Info("==== Bye! ====")
 			return m, tea.Quit
+		// === LETTERS ===
 		case key.Matches(msg, m.keys.Letter):
 			if m.state != stateLoading {
 				m.state = statePlaying
 				m.game.processLetter(msg.Text)
+			} else {
+				m.log.Info("Cannot enter letters while loading")
 			}
+		// === DELETE ===
 		case key.Matches(msg, m.keys.Delete):
 			if m.state != stateLoading {
 				m.state = statePlaying
 				m.game.processDelete()
+			} else {
+				m.log.Info("Cannot delete while loading")
 			}
+		// === RESTART ===
 		case key.Matches(msg, m.keys.Restart):
 			m.log.Info("==== Restarting game ====")
 			m.game.reset()
+		// === SUBMIT ===
 		case key.Matches(msg, m.keys.Submit):
-			cmds := []tea.Cmd{}
-			if m.game.rowReady() {
-				m.state = stateLoading
-				cmds = append(cmds, m.spinner.Tick)
-				cmds = append(cmds, func() tea.Msg {
-					if m.answerProvider.validWord(m.game.rowString()) {
-						return validWordMsg(true)
-					} else {
+			cmds := []tea.Cmd{m.spinner.Tick}
+			m.state = stateLoading
+			submitCmd := func() tea.Msg {
+				err := m.game.rowReady()
+				if err != nil {
+					if errors.Is(err, ErrRowNotFull) {
+						return rowNotFullMsg(true)
+					} else if errors.Is(err, ErrInvalidWord) {
 						return invalidWordMsg(true)
 					}
-				})
-			} else {
-				cmds = append(cmds, func() tea.Msg {
-					return rowNotFullMsg(true)
-				})
+				}
+				return validWordMsg(true)
 			}
+			cmds = append(cmds, submitCmd)
 			return m, tea.Batch(cmds...)
 		}
+	// === SPINNER TICK ===
 	case spinner.TickMsg:
 		if m.state == stateLoading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
+	// === SUBMIT RESULTS ===
 	case rowNotFullMsg:
 		m.state = stateRowNotFull
 		return m, nil
@@ -122,7 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case validWordMsg:
 		m.state = statePlaying
-		m.game.processSubmit()
+		m.game.Submit()
 	default:
 		// if log level is debug, print the current string in the active row
 		if m.log.GetLevel() == log.DebugLevel {
@@ -182,12 +192,11 @@ func newModel(logger *log.Logger) model {
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	return model{
-		game:           newGame(logger),
-		log:            logger,
-		help:           newHelp(),
-		keys:           keys,
-		state:          stateLoading,
-		answerProvider: provider,
-		spinner:        s,
+		game:    newGame(provider, logger),
+		log:     logger,
+		help:    newHelp(),
+		keys:    keys,
+		state:   stateLoading,
+		spinner: s,
 	}
 }
