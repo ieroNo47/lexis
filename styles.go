@@ -99,6 +99,14 @@ var helpBarStyle = lipgloss.NewStyle().
 
 var helpTextStyle = lipgloss.NewStyle()
 
+// popup styles
+
+var defaultPopUpStyle = lipgloss.NewStyle().
+	Padding(0, 1).
+	Margin(0).
+	Align(lipgloss.Center, lipgloss.Center).
+	Border(lipgloss.RoundedBorder())
+
 func updateStyles(msg tea.WindowSizeMsg) int {
 	// oVertical := containerStyle.GetBorderTopSize() +
 	// 	containerStyle.GetBorderBottomSize() +

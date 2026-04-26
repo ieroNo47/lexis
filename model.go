@@ -145,6 +145,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() tea.View {
 	// todo: Move logic to update header/footer to Update()
+
+	// init view
+	v := tea.NewView("")
+	v.WindowTitle = "lexis"
+	v.AltScreen = true
+
 	// header
 	header := headerStyle.Render("lexis")
 	var resultS string
@@ -180,9 +186,19 @@ func (m model) View() tea.View {
 		m.game.keyboard.render(),
 		resultRow,
 		helpRow)
-	v := tea.NewView(containerStyle.Render(view))
-	v.WindowTitle = "lexis"
-	v.AltScreen = true
+
+	popupText := "A pop up! Press any key to close."
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(containerStyle.Render(view)).X(0).Y(0),
+		// X is set to half the container width minus half the popup width to center the popup horizontally
+		// Y is set to half the view height minus 5 (arrived at this number through visual testing) to center the popup vertically
+		lipgloss.NewLayer(defaultPopUpStyle.Render(popupText)).X(containerStyle.GetWidth()/2 - (lipgloss.Width(popupText) / 2)).Y(lipgloss.Height(view)/2 - 5).Z(1),
+	}
+
+	comp := lipgloss.NewCompositor(layers...)
+
+	v.SetContent(comp.Render())
+	// v.SetContent(containerStyle.Render(view))
 	return v
 }
 
