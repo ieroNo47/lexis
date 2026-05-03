@@ -145,24 +145,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() tea.View {
 	// todo: Move logic to update header/footer to Update()
+
+	// init view
+	v := tea.NewView("")
+	v.WindowTitle = "lexis"
+	v.AltScreen = true
+
 	// header
 	header := headerStyle.Render("lexis")
 	var resultS string
 	var resultRow string
 	rowIndex, colIndex, _ := m.game.debugState()
-	if m.game.isWon() {
-		resultS = fmt.Sprintf("You won in %d/%d attempts!", rowIndex+1, len(m.game.grid.words))
-		resultRow = resultBarStyleWin.Render(resultS)
-	} else if m.game.isLost() {
-		resultS = fmt.Sprintf("Better luck next time! The answer was: %s", m.game.Answer())
-		resultRow = resultBarStyleLoss.Render(resultS)
-	} else if m.state == stateLoading {
-		resultRow = resultBarStyleLoading.Render(m.spinner.View())
-	} else if m.state == stateRowNotFull {
-		resultRow = resultBarStyleError.Render("Row is not full!")
-	} else if m.state == stateInvalidWord {
-		resultRow = resultBarStyleError.Render("Invalid word!")
+	var popupText string
+	var showPopup bool
+	var popupStyle lipgloss.Style
 
+	if m.game.isWon() {
+		popupText = fmt.Sprintf("You won in %d/%d attempts!", rowIndex+1, len(m.game.grid.words))
+		popupStyle = popUpStyleWin
+		showPopup = true
+	} else if m.game.isLost() {
+		popupText = fmt.Sprintf("Better luck next time!\nThe answer was: %s", m.game.Answer())
+		popupStyle = popUpStyleLoss
+		showPopup = true
+	} else if m.state == stateRowNotFull || m.state == stateInvalidWord {
+		if m.state == stateRowNotFull {
+			popupText = "Row is not full!"
+		} else {
+			popupText = "Invalid word!"
+		}
+		popupStyle = popUpStyleError
+		popupHelpStyle := lipgloss.NewStyle().Foreground(popupStyle.GetForeground()).Faint(true).Italic(true)
+		popupText = fmt.Sprintf("%s\n\n%s", popupText, popupHelpStyle.Render("Press any key to continue"))
+		showPopup = true
+	}
+
+	if m.state == stateLoading {
+		resultRow = resultBarStyleLoading.Render(m.spinner.View())
 	} else {
 		// debug row
 		resultS = fmt.Sprintf("Row: %d, Col: %d, RL: %d, L: %c, A: %s",
@@ -180,9 +199,31 @@ func (m model) View() tea.View {
 		m.game.keyboard.render(),
 		resultRow,
 		helpRow)
-	v := tea.NewView(containerStyle.Render(view))
-	v.WindowTitle = "lexis"
-	v.AltScreen = true
+
+	// main layer
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(containerStyle.Render(view)).X(0).Y(0),
+	}
+
+	// popup layer
+	if showPopup {
+		renderedPopup := popupStyle.Render(popupText)
+		popupWidth := lipgloss.Width(renderedPopup)
+		popupHeight := lipgloss.Height(renderedPopup)
+
+		// X is set to half the container width minus half the popup width to center the popup horizontally
+		popupX := containerStyle.GetWidth()/2 - (popupWidth / 2)
+		// Y is set to half the view height minus half the popup height to center the popup vertically
+		// (arrived at this minus 5 offset through visual testing)
+		popupY := lipgloss.Height(view)/2 - (popupHeight / 2) - 5
+
+		layers = append(layers, lipgloss.NewLayer(renderedPopup).X(popupX).Y(popupY).Z(1))
+	}
+
+	comp := lipgloss.NewCompositor(layers...)
+
+	v.SetContent(comp.Render())
+	// v.SetContent(containerStyle.Render(view))
 	return v
 }
 
