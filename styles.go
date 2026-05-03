@@ -107,6 +107,18 @@ var defaultPopUpStyle = lipgloss.NewStyle().
 	Align(lipgloss.Center, lipgloss.Center).
 	Border(lipgloss.RoundedBorder())
 
+var popUpStyleWin = defaultPopUpStyle.
+	BorderForeground(lipgloss.Color("#a3be8c")).
+	Foreground(lipgloss.Color("#a3be8c"))
+
+var popUpStyleLoss = defaultPopUpStyle.
+	BorderForeground(lipgloss.Color("#ebcb8b")).
+	Foreground(lipgloss.Color("#ebcb8b"))
+
+var popUpStyleError = defaultPopUpStyle.
+	BorderForeground(lipgloss.Color("#bf616a")).
+	Foreground(lipgloss.Color("#bf616a"))
+
 func updateStyles(msg tea.WindowSizeMsg) int {
 	// oVertical := containerStyle.GetBorderTopSize() +
 	// 	containerStyle.GetBorderBottomSize() +
