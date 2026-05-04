@@ -12,6 +12,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/log"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/ieroNo47/lexis/internal/providers"
 )
 
 const (
@@ -229,7 +231,7 @@ func (m model) View() tea.View {
 
 // newModel creates a new model with the given logger and initializes the answer provider and spinner
 func newModel(logger *log.Logger) model {
-	provider := newRandomAnswerProvider()
+	provider := providers.NewRandomAnswerProvider()
 	s := spinner.New()
 	s.Spinner = spinner.Points
 	return model{

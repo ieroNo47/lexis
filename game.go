@@ -7,6 +7,8 @@ import (
 	"slices"
 
 	"github.com/charmbracelet/log"
+
+	"github.com/ieroNo47/lexis/internal/providers"
 )
 
 const (
@@ -25,14 +27,14 @@ var (
 type game struct {
 	grid           grid
 	keyboard       keyboard
-	answerProvider answerProvider
+	answerProvider providers.AnswerProvider
 	answer         []rune
 	state          int
 	tempWord       tempWord
 	log            *log.Logger
 }
 
-func newGame(ap answerProvider, log *log.Logger) game {
+func newGame(ap providers.AnswerProvider, log *log.Logger) game {
 	grid := newGrid(6, 5)
 	grid.updateStyle(0, 0, activeStyle) // set the first cell as active
 	return game{
@@ -81,13 +83,13 @@ func (g game) Answer() string {
 
 func (g *game) initProvider() {
 	g.log.Debug("Initializing answer provider")
-	g.answerProvider.init()
+	g.answerProvider.Init()
 	g.log.Debug("Answer provider initialized")
 }
 
 func (g *game) start() {
 	g.log.Debug("== Starting Game ==")
-	answer := g.answerProvider.getAnswer()
+	answer := g.answerProvider.GetAnswer()
 	g.answer = []rune(answer)
 	g.log.Debug("Answer", "answer", string(g.answer))
 	g.state = playing
@@ -112,7 +114,7 @@ func (g *game) rowReady() error {
 		g.log.Info("Row is not full, cannot submit")
 		return fmt.Errorf("cannot submit: %w", ErrRowNotFull)
 	}
-	if !g.answerProvider.validWord(g.rowString()) {
+	if !g.answerProvider.ValidWord(g.rowString()) {
 		g.log.Info("Invalid word submitted", "word", g.rowString())
 		return fmt.Errorf("cannot submit: %w", ErrInvalidWord)
 	}
